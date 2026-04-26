@@ -130,3 +130,7 @@ The ORBIT-X system successfully integrates IOT hardware, edge databases, and dee
 3. **ThingsBoard IoT Platform**: [thingsboard.io](https://thingsboard.io/)
 4. **TensorFlow & Keras API**: [tensorflow.org](https://www.tensorflow.org/)
 5. **Mission TITAN-1 Technical Spec v2.4** (Internal Project Document)
+
+ 
+ < ! - -   D e p l o y m e n t   T r i g g e r   - - >  
+ 
