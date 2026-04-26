@@ -1,0 +1,126 @@
+:root {
+    /* Screenshot-derived Palette */
+    --bg-dark: #05080c;
+    --panel-bg: rgba(9, 12, 20, 0.85);
+    --panel-border: rgba(0, 229, 255, 0.15);
+    --glass-blur: blur(12px);
+
+    /* Neon Accents from Screenshot */
+    --accent-primary: #00e5ff;
+    /* Cyan */
+    --accent-secondary: #ffab00;
+    /* Orange-Yellow */
+    --accent-glow: 0 0 10px rgba(0, 229, 255, 0.3);
+
+    /* Status Colors */
+    --state-safe: #00e676;
+    --state-warn: #ffab00;
+    --state-crit: #ff1744;
+
+    /* Typography */
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --font-heading: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Layout Spacing */
+    --header-height: 85px;
+    --ribbon-height: 220px;
+
+    /* Antigravity Design Tokens - Enhanced */
+    --ag-panel-bg: rgba(6, 12, 24, 0.85);
+    --ag-accent-glow: 0 0 35px rgba(0, 229, 255, 0.25);
+    --ag-holographic: linear-gradient(135deg, rgba(0, 229, 255, 0.15) 0%, rgba(255, 171, 0, 0.05) 50%, transparent 100%);
+    --ag-scan-line-color: rgba(0, 229, 255, 0.2);
+    --ag-border-radius: 12px;
+    --ag-panel-padding: 24px;
+    --ag-font-weight-heavy: 900;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #03060a;
+    font-family: var(--font-heading);
+    color: var(--text-main);
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(0, 229, 255, 0.03) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 171, 0, 0.03) 0%, transparent 40%);
+}
+
+.glass-panel {
+    background: var(--ag-panel-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--ag-border-radius);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 229, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Unique Antigravity HUD Detail */
+.glass-panel::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    opacity: 0.4;
+    z-index: 10;
+}
+
+/* Scrollbar Utility - Master Level Cyber */
+::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    box-shadow: 0 0 10px var(--accent-primary);
+    border-radius: 0;
+}
+
+* {
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+}
+
+.cyan {
+    color: var(--accent-primary);
+    text-shadow: var(--accent-glow);
+}
+
+.amber {
+    color: var(--accent-secondary);
+}
+
+.green {
+    color: var(--state-safe);
+}
+
+.red {
+    color: var(--state-crit);
+}
+
+.mono {
+    font-family: var(--font-mono);
+}
+
+.spaced {
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.muted {
+    color: var(--text-muted);
+}

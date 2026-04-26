@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5005 http://127.0.0.1:5000 ws://localhost:1883 data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:5005 http://127.0.0.1:5000 ws://localhost:1883 mqtt://localhost:1883 https://en.wikipedia.org https://*.wikipedia.org; img-src 'self' data: https: https://unpkg.com https://*.wikipedia.org;">
+    <title>HYBRID AI ENGINE | ORBIT-X</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <!-- Warp-Sync: Eliminates Flash of Unstyled Content -->
+    <script>
+        (function() {
+            const type = sessionStorage.getItem('orbit_transition_type');
+            if (type) document.documentElement.classList.add('transition-active');
+        })();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"
+        onerror="handleLibError('FONTS')">
+    <script src="js/browser-mock.js"></script>
+    <script>
+        function handleLibError(name) {
+            console.error(`[Resilience] Critical Library Load Failure: ${name}`);
+            window[`${name}_FAILED`] = true;
+        }
+    </script>
+    <script src="js/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="handleLibError('CHART')"></script>
+</head>
+
+<body class="mission-theme">
+    <!-- Global Cyber Particle Background -->
+    <canvas id="cyber-bg"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; pointer-events:none; opacity:0.4;"></canvas>
+
+    <header class="top-bar glass-panel">
+        <div class="top-bar-left">
+            <div class="mission-info" style="display: flex; align-items: center; gap: 15px;">
+                <img src="img/logo.png" alt="Orbit-X Logo" style="height: 38px; filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4));" />
+                <div>
+                    <h1 class="cyan spaced" style="margin: 0; line-height: 1;">ORBIT-X <span id="app-version" style="font-size: 10px; vertical-align: middle; opacity: 0.5; margin-left: 5px;">v0.0.0</span></h1>
+                    <span class="muted mono" style="font-size: 10px; letter-spacing: 2px; margin-top: 2px; display: block;">MISSION // TITAN-1</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar-center">
+            <div class="system-clocks mono">
+                <div style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
+                    <span class="muted" style="font-size:10px;">UTC:</span>
+                    <span id="utc-time" style="font-size:18px; font-weight:bold;">00:00:00</span>
+                </div>
+                <div class="connection-status mono"
+                    style="font-size:9px; gap:10px; display:flex; justify-content:center;">
+                    <span class="green">UPLINK OK</span>
+                    <span class="green">DNLINK OK</span>
+                    <span id="hw-status"
+                        style="margin-left:5px; padding-left:10px; border-left:1px solid rgba(255,255,255,0.1); color:var(--state-warn);">HW:
+                        SEARCHING...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar-right">
+            <nav class="top-actions" style="gap:10px; display:flex; align-items:center;">
+                <button onclick="openTelemetryModal()" class="action-btn small mono" style="font-size: 10px;">LIVE MONITOR</button>
+                <a href="index.html" class="action-btn small mono" style="font-size: 10px;">DASHBOARD</a>
+                <a href="intel.html" class="action-btn small mono" style="font-size: 10px; border-color:var(--state-warn); color:var(--state-warn);">STRATEGIC INTEL</a>
+                <div class="glass-panel mono" id="global-risk-badge"
+                    style="padding:6px 15px; border-color:var(--accent-primary); background:rgba(0, 229, 255, 0.05); font-size:10px;">
+                    <span style="font-weight:900; color: var(--accent-primary);">SYS: NOMINAL</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-container full-page">
+        <div class="page-header">
+            <h2 class="page-title">
+                <span style="color:var(--state-safe); margin-right:10px;">⬤</span>
+                HYBRID MULTI-DOMAIN AI ENGINE
+                <span class="muted" style="font-size:14px; margin-left:10px;">(AGRI + SAT FUSION)</span>
+            </h2>
+        </div>
+
+        <!-- robust 3-Column Layout using CSS classes -->
+        <div class="ai-grid-columns" style="gap: 24px; margin-bottom: 24px;">
+
+            <!-- Column 1: L1 Data Acquisition -->
+            <div class="ai-column">
+                <div class="ag-metric-label" style="margin-bottom: 15px;">⬤ [ L1 ] DATA ACQUISITION LAYER</div>
+
+                <div class="ai-domain-panel glass-panel" style="padding:24px; background:rgba(0,255,100,0.03);">
+                    <div class="intelligence-mesh"></div>
+                    <div class="mono small green"
+                        style="display:flex; justify-content:space-between; margin-bottom:20px; position:relative; z-index: 2;">
+                        <span>● ESP32 AGRI-NODE</span>
+                        <span class="muted" style="font-weight: 900;">ACTIVE</span>
+                    </div>
+                    <div
+                        style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:0; position:relative; z-index: 2;">
+                        <div class="glass-panel"
+                            style="padding:10px; background:rgba(0,0,0,0.6); border-bottom: 2px solid var(--state-safe);">
+                            <div class="ag-metric-label" style="font-size:8px;">SOIL MOISTURE</div>
+                            <div id="st-soil" class="ag-metric-value" style="font-size:16px;">--.-%</div>
+                        </div>
+                        <div class="glass-panel"
+                            style="padding:10px; background:rgba(0,0,0,0.6); border-bottom: 2px solid var(--state-safe);">
+                            <div class="ag-metric-label" style="font-size:8px;">SOIL TEMP</div>
+                            <div id="st-tmp" class="ag-metric-value" style="font-size:16px;">--.-°C</div>
+                        </div>
+                        <div class="glass-panel"
+                            style="padding:10px; background:rgba(0,229,255,0.1); border-bottom: 2px solid var(--accent-primary);">
+                            <div class="ag-metric-label" style="font-size:8px; line-height:1;">LDR (LIGHT)</div>
+                            <div id="st-ldr" class="ag-metric-value"
+                                style="font-size:16px; color:var(--accent-primary); font-weight:900;">---</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ai-domain-panel glass-panel" style="padding:24px; background:rgba(0,229,255,0.03);">
+                    <div class="intelligence-mesh"></div>
+                    <div class="panel-header-title" style="margin-bottom:20px; position:relative; z-index: 2;">●
+                        SAT-TELEMETRY</div>
+                    <div style="display:flex; flex-direction:column; gap:15px; position:relative; z-index: 2;">
+                        <div
+                            style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,229,255,0.1); padding-bottom:8px;">
+                            <span class="ag-metric-label">GPS COORD:</span>
+                            <span id="st-gps" class="mono small" style="font-weight: 900;">-.-, -.-</span>
+                        </div>
+                        <div
+                            style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,229,255,0.1); padding-bottom:8px;">
+                            <span class="ag-metric-label">ORBIT DIST:</span>
+                            <span id="st-dist" class="mono small" style="font-weight:900;">--.-km</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span class="ag-metric-label">VELOCITY:</span>
+                            <span id="st-vel" class="cyan mono small" style="font-weight:900;">-.--km/s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: L2 ML Training Pipeline -->
+            <div class="ai-column">
+                <div class="ag-metric-label" style="margin-bottom: 15px;">⬤ [ L2 ] ML TRAINING PIPELINE</div>
+                <div class="ai-domain-panel glass-panel">
+                    <div class="intelligence-mesh"></div>
+                    <div class="scrolling-content">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; position:relative; z-index: 2;">
+                            <div class="ag-metric-label amber"
+                                style="font-weight:900; filter: drop-shadow(0 0 5px rgba(255,171,0,0.3));">AUTONOMOUS
+                                TRAINING ACTIVE</div>
+                            <button id="btn-reset-models" class="action-btn small red mono"
+                                style="font-size:9px; font-weight: 900; padding:4px 12px; border-radius: 4px;">RESET
+                                DB</button>
+                        </div>
+
+                        <div id="model-status" class="amber mono"
+                            style="text-align:center; margin-bottom:20px; font-size:12px; font-weight:900; position:relative; z-index: 2;">
+                            Collecting sensor data... (0/60 records)</div>
+
+                        <div class="glass-panel"
+                            style="padding:20px; margin-bottom:20px; border-color:rgba(0,229,255,0.3); background:rgba(0,10,20,0.7); position:relative; z-index: 2;">
+                            <div class="intelligence-mesh"></div>
+                            <div class="panel-header-title"
+                                style="display:flex; justify-content:space-between; margin-bottom:12px; font-size: 10px;">
+                                <span>● NEURAL CORE</span>
+                                <span id="backend-status-badge" class="red" style="font-weight:900;">OFFLINE</span>
+                            </div>
+                            <div class="muted mono" style="font-size:10px; font-weight: 700;">BEST MODEL: <span
+                                    id="backend-best-model" class="cyan">INITIALIZING</span></div>
+                        </div>
+
+                        <div
+                            style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px; position:relative; z-index: 2;">
+                            <div class="glass-panel" style="padding:15px; background:rgba(0,0,0,0.4);">
+                                <div class="ag-metric-label" style="font-size:9px;">EPOCH</div>
+                                <div id="tr-epoch" class="ag-metric-value" style="font-size: 18px;">-- / --</div>
+                                <div class="mono muted pulsing" style="font-size:8px; margin-top:5px;">INITIALIZING
+                                    CORE...</div>
+                            </div>
+                            <div class="glass-panel" style="padding:15px; background:rgba(0,0,0,0.4);">
+                                <div class="ag-metric-label" style="font-size:9px;">TRAIN LOSS</div>
+                                <div id="tr-loss" class="ag-metric-value" style="font-size: 18px;">--.----</div>
+                            </div>
+                            <div class="glass-panel" style="padding:15px; background:rgba(0,0,0,0.4);">
+                                <div class="ag-metric-label" style="font-size:9px;">VAL LOSS</div>
+                                <div id="tr-val-loss" class="ag-metric-value" style="font-size: 18px;">--.----</div>
+                            </div>
+                            <div class="glass-panel" style="padding:15px; background:rgba(0,0,0,0.4);">
+                                <div class="ag-metric-label" style="font-size:9px;">DEVICE</div>
+                                <div id="tr-device" class="ag-metric-value cyan" style="font-size: 14px;">WEBGL-2</div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="flex:1; min-height:160px; height: 160px; background:rgba(0,0,0,0.3); border-radius:8px; padding:15px; position:relative; z-index: 2; border: 1px solid rgba(255,255,255,0.05);">
+                            <canvas id="lossChart"></canvas>
+                        </div>
+
+                        <div class="mono muted"
+                            style="display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:20px; margin-top: 20px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; font-weight: 900; position:relative; z-index: 2;">
+                            <div id="metric-mae">MAE: --.---</div>
+                            <div id="metric-auc">ACC: --.-%</div>
+                            <div id="metric-mse">MSE: --.----</div>
+                            <div id="metric-thresh">THR: --.----</div>
+                        </div>
+                    </div>
+
+                    <!-- Tactical Training Console -->
+                    <div id="training-console" class="tactical-console">
+                        <div>[SYSTEM] Autonomous Engine Standby...</div>
+                        <div>[SYSTEM] Pulse Heartbeat: OK</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 3: L3 Real-time AI Inference -->
+            <div class="ai-column">
+                <div class="ag-metric-label" style="margin-bottom: 15px;">⬤ [ L3 ] REAL-TIME AI INFERENCE</div>
+
+                <div class="ai-domain-panel glass-panel"
+                    style="padding:24px; display:flex; flex-direction:column; gap:20px; flex:1;">
+                    <div class="intelligence-mesh"></div>
+                    <div
+                        style="border-left:4px solid var(--accent-primary); padding-left:20px; position:relative; z-index: 2;">
+                        <div class="panel-header-title" style="margin-bottom:10px; font-size: 10px;">M1: VELOCITY
+                            PREDICTOR (LSTM)</div>
+                        <div style="display:flex; align-items:baseline; gap:12px;">
+                            <span id="inf-velocity" class="ag-metric-value" style="font-size:36px;">-.---</span>
+                            <span class="muted" style="font-size:12px; font-weight: bold;">KM/S</span>
+                        </div>
+                    </div>
+
+                    <div
+                        style="border-left:4px solid var(--accent-secondary); padding-left:20px; position:relative; z-index: 2;">
+                        <div class="panel-header-title"
+                            style="margin-bottom:10px; font-size: 10px; color: var(--accent-secondary); text-shadow: 0 0 10px rgba(255,171,0,0.4);">
+                            M2: THERMAL RISK (ATTENTION)</div>
+                        <div style="display:flex; align-items:baseline; gap:12px;">
+                            <span id="inf-thermal" class="ag-metric-value"
+                                style="font-size:36px; color:var(--state-safe);">---</span>
+                            <span id="inf-thermal-conf" class="muted"
+                                style="font-size:14px; font-weight: bold;">(--.-%)</span>
+                        </div>
+                    </div>
+
+                    <div
+                        style="border-left:4px solid var(--state-crit); padding-left:20px; position:relative; z-index: 2;">
+                        <div class="panel-header-title"
+                            style="margin-bottom:10px; font-size: 10px; color: var(--state-crit); text-shadow: 0 0 10px rgba(255,23,68,0.4);">
+                            M3: SYSTEM ANOMALY (AE)</div>
+                        <div class="ag-metric-value" style="font-size:36px; color:var(--state-crit);" id="inf-anomaly">
+                            -.----</div>
+                        <div class="muted mono"
+                            style="margin-top:8px; font-size:10px; font-weight: 700; letter-spacing:1px;">THRESHOLD:
+                            <span id="inf-anomaly-thresh" style="color: #fff;">--.----</span></div>
+                    </div>
+
+                    <div class="glass-panel"
+                        style="margin-top:auto; padding:15px; background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.2); position:relative; z-index: 2;">
+                        <div class="ag-metric-label cyan" style="font-size:10px; font-weight:900; margin-bottom:8px;">⬤
+                            HYBRID DOMAIN INSIGHT (XAI)</div>
+                        <div id="xai-insight" class="muted mono"
+                            style="font-size:10px; line-height:1.4; min-height:30px;">
+                            Analyzing cross-domain correlations between orbital velocity and soil moisture spikes...
+                        </div>
+                    </div>
+
+                    <div style="margin-top:15px; text-align:right; position:relative; z-index: 2;">
+                        <span class="ag-metric-label" style="font-size:9px;">LAST SYNC:</span>
+                        <span id="inf-trained-time" class="muted mono pulsing"
+                            style="font-size:9px; margin-left:10px;">SYNCING SATELLITE...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Integrated Header: Hybrid Agri-Intelligence Modules -->
+        <div class="glass-panel" style="padding:20px 30px; border-top: 2px solid var(--state-safe);">
+            <div class="intelligence-mesh"></div>
+            <h3 class="panel-header-title"
+                style="color: var(--state-safe); text-shadow: 0 0 10px rgba(0,230,118,0.4); margin:0 0 20px 0; position:relative; z-index: 2;">
+                ⬤ HYBRID AGRI-INTEL MODULES (ADVANCED SCAN)</h3>
+            <div class="agri-grid" style="position:relative; z-index: 2;">
+
+                <!-- Module 1 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title" style="font-size: 10px;">PRESCRIPTION</span>
+                        <button id="btn-agri-map" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">SCAN</button>
+                    </div>
+                    <div id="agri-map-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-map-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">MAPPING...</div>
+                </div>
+
+                <!-- Module 2 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title" style="font-size: 10px;">PEST DETECTION</span>
+                        <button id="btn-agri-pest" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">SCAN</button>
+                    </div>
+                    <div id="agri-pest-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-pest-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">SCANNING...</div>
+                </div>
+
+                <!-- Module 3 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title" style="font-size: 10px; color: var(--state-safe);">YIELD
+                            EST.</span>
+                        <button id="btn-agri-yield" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">EST</button>
+                    </div>
+                    <div id="agri-yield-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-yield-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">ESTIMATING...</div>
+                </div>
+
+                <!-- Module 4 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title"
+                            style="font-size: 10px; color: var(--state-safe);">IRRIGATION</span>
+                        <button id="btn-agri-irrig" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">SCHED</button>
+                    </div>
+                    <div id="agri-irrig-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-irrig-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">SCHEDULING...</div>
+                </div>
+
+                <!-- Module 5 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title" style="font-size: 10px; color: var(--accent-secondary);">SOIL
+                            HEALTH</span>
+                        <button id="btn-agri-soil" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">ANL</button>
+                    </div>
+                    <div id="agri-soil-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-soil-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">ANALYZING...</div>
+                </div>
+
+                <!-- Module 6 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title"
+                            style="font-size: 10px; color: var(--accent-secondary);">CLIMATE G.</span>
+                        <button id="btn-agri-clim" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">RISK</button>
+                    </div>
+                    <div id="agri-clim-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-clim-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">ASSESSING...</div>
+                </div>
+
+                <!-- Module 7 -->
+                <div class="agri-module-card glass-panel" style="background: rgba(0,0,0,0.3); padding: 15px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="panel-header-title" style="font-size: 10px; color: var(--accent-primary);">STRAT.
+                            ADVISORY</span>
+                        <button id="btn-agri-adv" class="action-btn small mono"
+                            style="font-size: 9px; padding: 2px 10px; border-radius: 4px;">SYNC</button>
+                    </div>
+                    <div id="agri-adv-result" class="muted mono"
+                        style="min-height:45px; font-size:10px; margin:10px 0; font-weight: 700; line-height: 1.4;">
+                        Offline: Service Unavailable</div>
+                    <div id="agri-adv-status" class="ag-metric-label"
+                        style="font-size:8px; opacity: 0.3; margin-top:auto;">COMPILING...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assistant Chatbot (New Element) -->
+    <div id="orbit-chatbot">
+        <div id="chat-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="green">●</span>
+                <span class="mono cyan" style="font-weight:bold;">ORBIT-ASSISTANT (API)</span>
+            </div>
+            <button id="chat-toggle">▲</button>
+        </div>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chat-input" placeholder="Ask about sensor data or query NLP...">
+                <button id="chat-send">SEND</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="target-tooltip" class="mono glass-panel"
+        style="position:fixed; display:none; background:rgba(0,0,0,0.8); z-index:1000; padding:10px; pointer-events:none; border:1px solid var(--accent-primary); font-size:10px; white-space:pre;">
+    </div>
+
+    <!-- Telemetry Modal -->
+    <div id="telemetry-modal" class="modal-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:10000; align-items:center; justify-content:center; padding:40px;">
+        <div class="glass-panel"
+            style="width:100%; max-width:1200px; max-height:90vh; display:flex; flex-direction:column; padding:30px;">
+            <div class="intelligence-mesh"></div>
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; position:relative; z-index: 2;">
+                <h2 class="panel-header-title" style="font-size:18px;">LIVE MISSION TELEMETRY</h2>
+                <div style="display:flex; gap:15px;">
+                    <button class="action-btn small mono">OPEN RAW TERMINAL</button>
+                    <button onclick="closeTelemetryModal()" class="action-btn small mono"
+                        style="border-color:var(--state-crit); color:var(--state-crit);">CLOSE [ESC]</button>
+                </div>
+            </div>
+            <div id="telemetry-grid-large" class="telemetry-grid"
+                style="display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; overflow-y:auto; position:relative; z-index: 2;">
+                <!-- Populated by dashboard.js -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+    <script src="js/hybrid-engine.js"></script>
+    <script src="js/experience-mgr.js"></script>
+    <script src="js/agri-modules.js"></script>
+    <script src="js/chatbot-knowledge.js"></script>
+    <script src="js/assistant.js"></script>
+</body>
+
+</html>

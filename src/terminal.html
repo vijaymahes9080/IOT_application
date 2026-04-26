@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raw Receiving Terminal</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
+    <link rel="stylesheet" href="css/animations.css">
+    <style>
+        :root {
+            --term-bg: #050510;
+            --term-fg: #00ffcc;
+            --term-err: #ff4444;
+            --term-warn: #ffaa00;
+        }
+
+        body {
+            background-attachment: fixed;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px;
+            background: radial-gradient(circle at top right, #111827 0%, #050510 100%);
+            background-color: var(--term-bg);
+            /* Grid overlay for terminal look */
+            background-image:
+                linear-gradient(rgba(0, 255, 204, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 204, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            color: var(--term-fg);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            border: 1px solid var(--term-fg);
+        }
+
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--term-fg);
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            /* Improvement 6: Narrowed drag region to header only */
+            -webkit-app-region: drag;
+        }
+
+        .close-btn {
+            background: none;
+            color: var(--term-err);
+            border: 1px solid var(--term-err);
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            font-weight: bold;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            color: #ccc;
+        }
+
+        .console-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            -webkit-app-region: no-drag;
+        }
+
+        .log-line {
+            margin: 2px 0;
+        }
+
+        .log-rx {
+            color: var(--term-fg);
+        }
+
+        .log-tx {
+            color: #8888ff;
+        }
+
+        .log-err {
+            color: var(--term-err);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>TERMINAL :: RAW DATA FEED</div>
+        <div class="stats">
+            <span>PING: <span id="ping-ms">14</span>ms</span>
+            <span>LOSS: <span id="pkt-loss">0.0</span>%</span>
+            <span id="hw-status" style="color:var(--term-warn); font-weight: bold;">[SIM]</span>
+        </div>
+        <button class="close-btn" onclick="window.close()">[ X ]</button>
+    </div>
+    <div class="console-output" id="console-output">
+        <div class="log-line log-tx">[SYSTEM] Terminal initialized. Awaiting TCP/MQTT stream...</div>
+    </div>
+
+    <div id="orbit-chatbot">
+        <div id="chat-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="green">●</span>
+                <span class="mono cyan" style="font-weight:bold;">ORBIT-ASSISTANT (API)</span>
+            </div>
+            <button id="chat-toggle">▲</button>
+        </div>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chat-input" placeholder="Query Neural Engine...">
+                <button id="chat-send">SEND</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include layout variables and assistant styles -->
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="js/assistant.js"></script>
+    <script src="js/experience-mgr.js"></script>
+    <script src="js/terminal.js"></script>
+</body>
+
+</html>

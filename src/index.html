@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5005 http://127.0.0.1:5000 ws://localhost:1883 data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:5005 http://127.0.0.1:5000 ws://localhost:1883 mqtt://localhost:1883 https://en.wikipedia.org https://*.wikipedia.org; img-src 'self' data: https: https://unpkg.com https://*.wikipedia.org;">
+    <title>ORBIT-X | Mission Dashboard</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Core Visual Libraries (with Resilience) -->
+    <script src="js/browser-mock.js"></script>
+    <script>
+        function handleLibError(name) {
+            console.error(`[Resilience] Critical Library Load Failure: ${name}`);
+            window[`${name}_FAILED`] = true;
+        }
+    </script>
+    <!-- Warp-Sync: Eliminates Flash of Unstyled Content -->
+    <script>
+        (function() {
+            const type = sessionStorage.getItem('orbit_transition_type');
+            if (type) document.documentElement.classList.add('transition-active');
+        })();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+        onerror="handleLibError('THREE')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"
+        onerror="handleLibError('ORBIT')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="handleLibError('CHART')"></script>
+    <script src="js/tf.min.js"></script>
+
+    <!-- Leaflet for Deployment Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" onerror="handleLibError('LEAFLET')"></script>
+</head>
+
+<body class="mission-theme">
+    <!-- Global Cyber Particle Background -->
+    <canvas id="cyber-bg"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; pointer-events:none; opacity:0.4;"></canvas>
+
+    <!-- Header: Consistent with Screenshot -->
+    <header class="top-bar glass-panel">
+        <div class="top-bar-left">
+            <div class="mission-info" style="display: flex; align-items: center; gap: 15px;">
+                <img src="img/logo.png" alt="Orbit-X Logo" style="height: 38px; filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4));" />
+                <div>
+                    <h1 class="cyan spaced" style="margin: 0; line-height: 1;">ORBIT-X <span id="app-version" style="font-size: 10px; vertical-align: middle; opacity: 0.5; margin-left: 5px;">v0.0.0</span></h1>
+                    <span class="muted mono" style="font-size: 10px; letter-spacing: 2px; margin-top: 2px; display: block;">MISSION // TITAN-1</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar-center">
+            <div class="system-clocks mono">
+                <div style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
+                    <span class="muted" style="font-size:10px;">UTC:</span>
+                    <span id="utc-time" style="font-size:18px; font-weight:bold;">00:00:00</span>
+                </div>
+                <div class="connection-status mono"
+                    style="font-size:9px; gap:10px; display:flex; justify-content:center;">
+                    <span class="green">UPLINK OK</span>
+                    <span class="green">DNLINK OK</span>
+                    <span id="hw-status"
+                        style="margin-left:5px; padding-left:10px; border-left:1px solid rgba(255,255,255,0.1); color:var(--state-warn);">HW:
+                        SEARCHING...</span>
+                    <span id="cloud-sync-status"
+                        style="margin-left:5px; padding-left:10px; border-left:1px solid rgba(255,255,255,0.1); color:var(--accent-primary);">CLOUD:
+                        SYNCING...</span>
+                    <span id="model-source-status"
+                        style="margin-left:5px; padding-left:10px; border-left:1px solid rgba(255,255,255,0.1); color:var(--state-safe);">MODEL:
+                        CLOUD</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="top-bar-right">
+            <nav class="top-actions" style="gap:10px; display:flex; align-items:center;">
+                <input type="text" id="cloud-sync-input" placeholder="CLOUD SYNC CODE" class="mono small" style="background: rgba(0,0,0,0.5); border: 1px solid var(--accent-primary); color: #00e5ff; padding: 4px 8px; font-size: 10px; border-radius: 4px; outline: none; width: 120px;" onchange="if(window.electron) window.electron.updateCloudCode(this.value);" title="Paste your ThingsBoard Access Token here" />
+                <button onclick="openTelemetryModal()" class="action-btn small mono" style="font-size: 10px;">LIVE MONITOR</button>
+                <a href="ai.html" class="action-btn small mono" style="font-size: 10px; border-color:var(--accent-secondary); color:var(--accent-secondary);">AI ENGINE</a>
+                <a href="intel.html" class="action-btn small mono" style="font-size: 10px; border-color:var(--state-warn); color:var(--state-warn);">STRATEGIC INTEL</a>
+                <div class="glass-panel mono" id="global-risk-badge"
+                    style="padding:6px 15px; border-color:var(--accent-primary); background:rgba(0, 229, 255, 0.05); font-size:10px;">
+                    <span style="font-weight:900; color: var(--accent-primary);">SYS: NOMINAL</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Main Simulation Panel -->
+        <main class="center-panel">
+            <div class="split-view">
+                <div class="canvas-container main-canvas glass-panel" id="orbit-3d-canvas">
+                    <div class="intelligence-mesh"></div>
+                    <!-- Overlay: Attitude Visualizer - FIXED: Absolute Position -->
+                    <div class="attitude-visualizer glass-panel"
+                        style="position: absolute; top: 20px; left: 20px; width: 220px; background:rgba(0,0,0,0.6); padding:15px; z-index: 10;">
+                        <div class="intelligence-mesh"></div>
+                        <div class="panel-header-title"
+                            style="display:flex; align-items:center; gap:8px; font-size:10px; margin-bottom: 5px;">
+                            <span>💠</span> ATTITUDE VISUALIZER
+                        </div>
+                        <div id="craft-3d" style="height:100px;"></div>
+                        <div class="mono"
+                            style="font-size:10px; display:flex; justify-content:space-between; margin-top:5px; position:relative; z-index: 2; pointer-events: none;">
+                            <div>P: <span class="green" id="att-pitch">-4.3°</span> R: <span class="green"
+                                    id="att-roll">1.7°</span> Y: <span class="green" id="att-yaw">60.4°</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Overlay: Alt/Vel - FIXED: Absolute Position -->
+                    <div class="sim-overlay-stats glass-panel mono"
+                        style="position: absolute; top: 20px; right: 20px; border-left: 3px solid var(--accent-primary); z-index: 10; padding: 12px; pointer-events: none;">
+                        <div class="intelligence-mesh"></div>
+                        <div style="position:relative; z-index: 2; font-size: 11px;">ALTITUDE: <span class="green"
+                                id="sim-alt">400.12 KM</span></div>
+                        <div style="position:relative; z-index: 2; font-size: 11px;">VELOCITY: <span class="green"
+                                id="sim-vel">7.66 KM/S</span></div>
+                    </div>
+
+                    <div class="sim-controls"
+                        style="position: absolute; bottom: 20px; left: 20px; z-index: 10; display:flex; gap:10px;">
+                        <button class="action-btn small mono" style="font-size: 9px; padding: 4px 10px;">TRACK:
+                            FREE</button>
+                        <button id="btn-toggle-heatmap" class="action-btn small mono"
+                            style="font-size: 9px; padding: 4px 10px;">HEATMAP: OFF</button>
+                    </div>
+                </div>
+
+                <div class="side-canvases">
+                    <div class="canvas-container sub-canvas glass-panel" id="satellite-3d-canvas">
+                        <div class="intelligence-mesh"></div>
+                        <div class="canvas-label mono amber"
+                            style="z-index: 2; position:relative; font-weight: 900; letter-spacing: 2px;">SAT CAM</div>
+                    </div>
+                    <div class="canvas-container sub-canvas glass-panel" id="path-3d-canvas">
+                        <div class="intelligence-mesh"></div>
+                        <div class="canvas-label mono red"
+                            style="z-index: 2; position:relative; font-weight: 900; letter-spacing: 2px;">PATH CAM</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Tactical Panel -->
+        <aside class="right-panel">
+            <!-- Threat Intel -->
+            <div class="glass-panel decision-panel"
+                style="padding:20px; display:flex; flex-direction:column; gap:15px;">
+                <div class="intelligence-mesh"></div>
+                <div
+                    style="display:flex; justify-content:space-between; align-items:baseline; position:relative; z-index: 2;">
+                    <span class="ag-metric-label">THREAT SCORE</span>
+                    <span class="muted mono small">ETA: --:--</span>
+                </div>
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; position:relative; z-index: 2;">
+                    <span class="ag-metric-value" style="font-size: 32px;">12 <span class="green"
+                            style="font-size: 20px;">↓</span></span>
+                    <div style="flex:1; height:40px; margin-left:20px;">
+                        <canvas id="radar-waveform"></canvas>
+                    </div>
+                    <span class="muted mono" style="font-size:9px; margin-left:10px;">FAIL PROB: 0.1%</span>
+                </div>
+            </div>
+
+            <!-- Decision Engine -->
+            <div class="glass-panel decision-panel" style="padding:20px;">
+                <div class="intelligence-mesh"></div>
+                <div
+                    style="display:flex; justify-content:space-between; margin-bottom:20px; position:relative; z-index: 2;">
+                    <span class="panel-header-title">DECISION ENGINE <span class="green">●</span></span>
+                    <span class="green mono"
+                        style="border:1px solid var(--state-safe); padding:2px 10px; border-radius:4px; font-size: 9px; font-weight: 900;">NOMINAL
+                        SEVERITY</span>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:25px; position:relative; z-index: 2;">
+                    <div style="position:relative; width:85px; height:85px;">
+                        <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);">
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" />
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none" stroke="var(--state-safe)" stroke-width="2.5" stroke-dasharray="98, 100" />
+                        </svg>
+                        <div
+                            style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:900; font-family: var(--font-mono);">
+                            98%</div>
+                    </div>
+                    <div style="flex:1;">
+                        <div class="ag-metric-label" style="margin-bottom:10px;">30-MIN RISK FORECAST</div>
+                        <div
+                            style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; position:relative; overflow: hidden;">
+                            <div
+                                style="position:absolute; top:0; left:0; height:100%; width: 20%; background:linear-gradient(90deg, var(--state-safe), var(--state-warn));">
+                            </div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:15px;">
+                            <div class="muted mono" style="font-size:10px;">CONFIDENCE STAB: <span
+                                    style="color:#fff;">99%</span></div>
+                            <div class="muted mono" style="font-size:10px; text-align:right;">TS: 1314542</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics -->
+            <div class="glass-panel" style="padding:20px; flex:1;">
+                <div class="intelligence-mesh"></div>
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; position:relative; z-index: 2;">
+                    <span class="panel-header-title">HISTORICAL ANALYTICS</span>
+                    <select id="chart-metric-selector" class="mono small"
+                        style="background:rgba(0,0,0,0.5); color:#fff; border:1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 8px;">
+                        <option value="risk">Threat Score</option>
+                        <option value="temp1">Temp-1</option>
+                        <option value="temp2">Temp-2</option>
+                        <option value="battv">Battery</option>
+                    </select>
+                </div>
+                <div style="height:140px; position:relative; z-index: 2;">
+                    <canvas id="historicalChart"></canvas>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Telemetry Ribbon: Holographic Ground Data -->
+    <section class="telemetry-ribbon glass-panel">
+        <div class="intelligence-mesh"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; position:relative; z-index: 2;">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <h3 class="panel-header-title" style="margin:0; font-size:13px;">LIVE TELEMETRY MONITORING</h3>
+                <span id="hw-status-ribbon" class="mono"
+                    style="font-size:10px; color:var(--state-warn); padding:2px 8px; border:1px solid rgba(255,255,255,0.1); border-radius:4px;">STATUS:
+                    SEARCHING...</span>
+            </div>
+            <button id="btn-open-terminal" class="action-btn small mono"
+                style="font-size: 10px; border-radius: 4px;">OPEN RAW TERMINAL</button>
+        </div>
+        <div class="telemetry-grid" id="telemetry-grid" style="position:relative; z-index: 2;">
+            <!-- Populated by dashboard.js -->
+        </div>
+    </section>
+
+    <!-- Chatbot Assistant -->
+    <div id="orbit-chatbot">
+        <div id="chat-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="green">●</span>
+                <span class="mono cyan" style="font-weight:bold;">ORBIT-ASSISTANT</span>
+            </div>
+            <button id="chat-toggle">▲</button>
+        </div>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chat-input" placeholder="Query Neural Engine...">
+                <button id="chat-send">SEND</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="target-tooltip" class="mono glass-panel"
+        style="position:fixed; display:none; background:rgba(0,0,0,0.8); z-index:1000; padding:10px; pointer-events:none; border:1px solid var(--accent-primary); font-size:10px; white-space:pre;">
+    </div>
+
+    <!-- Telemetry Modal -->
+    <div id="telemetry-modal" class="modal-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:10000; align-items:center; justify-content:center; padding:40px;">
+        <div class="glass-panel"
+            style="width:100%; max-width:1200px; max-height:90vh; display:flex; flex-direction:column; padding:30px;">
+            <div class="intelligence-mesh"></div>
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; position:relative; z-index: 2;">
+                <h2 class="panel-header-title" style="font-size:18px;">LIVE MISSION TELEMETRY</h2>
+                <div style="display:flex; gap:15px;">
+                    <button class="action-btn small mono">OPEN RAW TERMINAL</button>
+                    <button onclick="closeTelemetryModal()" class="action-btn small mono"
+                        style="border-color:var(--state-crit); color:var(--state-crit);">CLOSE [ESC]</button>
+                </div>
+            </div>
+            <div id="telemetry-grid-large" class="telemetry-grid"
+                style="display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; overflow-y:auto; position:relative; z-index: 2;">
+                <!-- Populated by dashboard.js -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/3d-globe.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/ai-engine.js"></script>
+    <script src="js/experience-mgr.js"></script>
+    <script src="js/hybrid-engine.js"></script>
+    <script src="js/agri-modules.js"></script>
+    <script src="js/assistant.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/cloud-mgr.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+*.log
+.env
+.DS_Store
+package-lock.json
+mission_logs.mdb

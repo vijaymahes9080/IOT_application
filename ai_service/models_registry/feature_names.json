@@ -1,0 +1,1 @@
+["satellite_lat", "satellite_lon", "satellite_distance_km", "satellite_velocity_kms", "temp1", "temp2", "batt_voltage", "current_amps", "solar_power_w", "gyro_x", "gyro_y", "gyro_z", "soil_temp", "ldr_sensor", "humidity", "ultrasonic_dist"]

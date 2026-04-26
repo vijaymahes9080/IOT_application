@@ -1,0 +1,45 @@
+{
+    "mission": {
+        "id": "TITAN-1",
+        "operator": "Ground Control 1"
+    },
+    "database": {
+        "filename": "mission_logs.mdb",
+        "throttling": {
+            "initial_interval_ms": 2000,
+            "standard_interval_ms": 5000,
+            "threshold_records": 60
+        }
+    },
+    "ai_service": {
+        "url": "http://127.0.0.1:5005",
+        "port": 5005,
+        "host": "127.0.0.1",
+        "training_interval_seconds": 300,
+        "models_registry": "ai_service/models_registry"
+    },
+    "mqtt": {
+        "broker": "mqtt://localhost:1883",
+        "topics": {
+            "telemetry": "satellite/titan-1/telemetry",
+            "ai_results": "satellite/titan-1/ai_results"
+        },
+        "timeout": 5000,
+        "reconnect_period": 10000
+    },
+    "hardware": {
+        "fps_cap": 24,
+        "serial": {
+            "baud_rate": 115200,
+            "discovery_retry_ms": 5000,
+            "simulation_interval_ms": 12000
+        }
+    },
+    "thingsboard": {
+        "host": "thingsboard.cloud",
+        "accessToken": "Ket9IzEU9d6fFOnUXgs2",
+        "sync_interval_ms": 8000,
+        "cloud_prediction_enabled": false,
+        "cloud_prediction_endpoint": "/api/v1/predict"
+    }
+}
