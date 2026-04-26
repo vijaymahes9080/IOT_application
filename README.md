@@ -10,7 +10,7 @@
 **ORBIT-X** is a next-generation autonomous satellite monitoring system designed for the **TITAN-1 Mission**. It bridges the gap between low-level IOT hardware telemetry and high-level AI-driven decision-making. The system utilizes **Hybrid Edge Computing**, where critical data processing happens locally to ensure zero-latency responses, while long-term trends and global model weights are managed via the cloud.
 
 > [!IMPORTANT]
-> **Full Documentation**: For a deep-dive into the engineering, mathematics, and operational logic of Orbit-X, please refer to the **[MISSION TITAN-1 TECHNICAL REPORT](file:///d:/intership/IOT_2026-main/MISSION_TITAN_1_TECHNICAL_REPORT.md)** (25-Page Technical Manifesto).
+> **Full Documentation**: For a deep-dive into the engineering, mathematics, and operational logic of Orbit-X, please refer to the **[MISSION TITAN-1 TECHNICAL REPORT](MISSION_TITAN_1_TECHNICAL_REPORT.md)** (25-Page Technical Manifesto).
 
 The system is built on the principle of **Autonomous Resilience**, meaning it can detect and mitigate hardware or software failures without human intervention. Key objectives include:
 - **High-Fidelity Telemetry Tracking**: Real-time acquisition of 15+ sensor parameters.

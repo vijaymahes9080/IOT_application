@@ -66,6 +66,10 @@ For metrics like battery voltage and solar current, we employ **Long Short-Term 
 ## 4. HARDWARE ARCHITECTURE (THE AGRINODE)
 
 ### 4.1. ESP32 Core Processing
+
+![ORBIT-X Hardware Architecture](assets/orbit_x_circuit_diagram.png)
+*Figure 1: High-fidelity hardware architecture showing the ESP32 integration with various environmental and inertial sensors.*
+
 The ESP32 (Xtensa Dual-Core 32-bit) acts as the central nervous system of our ground nodes. It utilizes FreeRTOS to manage concurrent tasks:
 - **Task A**: Sensor polling at 100Hz.
 - **Task B**: Data serialization and UART transmission.
@@ -85,6 +89,10 @@ Each node is equipped with a high-fidelity sensor suite:
 ## 5. SOFTWARE ECOSYSTEM & INTERFACE
 
 ### 5.1. Electron HUD Design (Glassmorphism & UX)
+
+![ORBIT-X Dashboard Interface](assets/dashboard_preview.png)
+*Figure 2: The ORBIT-X Command Console HUD showing real-time AI predictions and mission telemetry.*
+
 The ORBIT-X interface is designed using **Glassmorphism** principles to simulate a high-tech satellite cockpit. 
 - **Backdrop-Filter**: We use `backdrop-filter: blur(15px)` on semi-transparent panels to create depth.
 - **Cyber-Particle Background**: A custom HTML5 Canvas script renders 1,000+ interactive particles that respond to telemetry spikes, providing a visceral "feeling" of system health.
