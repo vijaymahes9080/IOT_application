@@ -121,6 +121,8 @@ For detailed engineering specs, refer to:
 - 📑 **[Full Technical Report](MISSION_TITAN_1_TECHNICAL_REPORT.md)**
 - 📘 **[Project Document](ORBIT_X_PROJECT_DOCUMENT.md)**
 - 📋 **[Component Analysis](docs/orbit-x_full_project_analysis.md)**
+- ⚖️ **[License](LICENSE)**
+- 🤝 **[Contributing Guidelines](CONTRIBUTING.md)**
 
 ---
 
