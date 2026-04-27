@@ -30,6 +30,19 @@
 
 ---
 
+## ✨ KEY FEATURES
+
+<div align="center">
+
+| 🤖 AI DRIVEN | ⚡ REAL-TIME | 🔒 RESILIENT |
+| :--- | :--- | :--- |
+| **Autonomous Retraining** | **60 FPS HUD Tracking** | **GPU Defense Mode** |
+| Every 15 minutes, the system optimizes its own models based on drift. | Zero-lag visualization of orbital and soil telemetry. | Stability fallback for low-end or unstable hardware drivers. |
+
+</div>
+
+---
+
 ## 🛠️ 2. THE TECH STACK
 
 | Layer | Technologies | Role |
