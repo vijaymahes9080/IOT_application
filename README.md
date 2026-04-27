@@ -121,10 +121,3 @@ For detailed engineering specs, refer to:
 - 📋 **[Component Analysis](docs/orbit-x_full_project_analysis.md)**
 
 ---
-
-<div align="center">
-
-**MISSION TITAN-1 | ORBIT-X PROJECT**  
-*Maintained by [Vijay Maheswaran](https://github.com/vijaymahes9080)*
-
-</div>
