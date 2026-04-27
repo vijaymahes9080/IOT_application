@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node launch.js",
     "serve": "node server.js",
+    "health": "node health_check.js",
     "dist": "electron-builder -w"
   },
   "dependencies": {
