@@ -141,6 +141,7 @@ For detailed engineering specs, refer to:
 
 <div align="center">
 
-**MISSION TITAN-1 | ORBIT-X PROJECT**
+**MISSION TITAN-1 | ORBIT-X PROJECT**  
+*Maintained by [vijaymahes](https://github.com/vijaymahes9080)*
 
 </div>
