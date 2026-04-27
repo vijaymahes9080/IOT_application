@@ -13,7 +13,7 @@
 
 [Project Document](ORBIT_X_PROJECT_DOCUMENT.md) • [Technical Manifesto](MISSION_TITAN_1_TECHNICAL_REPORT.md) • [Mission Logs](mission_logs.mdb)
 
-**🔗 [Hosted Hub](https://vijaymahes9080.github.io/IOT_application/) | 📂 [Source Code](https://github.com/vijaymahes9080/IOT_application) | 📊 [Cloud Dashboard](https://thingsboard.cloud/dashboard/)**
+**🔗 [Hosted Hub](https://vijaymahes9080.github.io/IOT_application/) | 📂 [Source Code](https://github.com/vijaymahes9080/IOT_application)**
 
 </div>
 
@@ -129,7 +129,6 @@ For detailed engineering specs, refer to:
 ## 🔗 9. PROJECT LINKS
 - **Main Repository**: [github.com/vijaymahes9080/IOT_application](https://github.com/vijaymahes9080/IOT_application)
 - **Hosted Frontend**: [Orbit-X Web Hub](https://vijaymahes9080.github.io/IOT_application/)
-- **Live Monitoring Dashboard**: [ThingsBoard Cloud Console](https://thingsboard.cloud/dashboard/)
 - **Hardware Simulation**: [Wokwi Project Simulation](https://wokwi.com/projects/306ddcf8-857e-4240-b742-4a6389a0dc2a)
 
 ---
