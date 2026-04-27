@@ -1,8 +1,38 @@
+# Dependencies
 node_modules/
+package-lock.json
+
+# Builds
 dist/
 release/
+build/
+*.exe
+*.msi
+
+# AI / Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+ai_service/models_registry/*.pkl
+ai_service/models_registry/*.json
+
+# Logs & DB
 *.log
+mission_logs.mdb
+*.sqlite
+
+# OS / IDE
 .env
 .DS_Store
-package-lock.json
-mission_logs.mdb
+.vscode/
+.idea/
+Thumbs.db
+
+# Office Temp Files
+~$*.doc*
+~$*.xls*
+
+# Temporary
+scratch/
+temp/
