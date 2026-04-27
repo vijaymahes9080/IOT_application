@@ -1,4 +1,4 @@
-# 🛰️ ORBIT-X: MISSION TITAN-1
+# 🛰️ ORBIT-X (AGRILINKSAT): MISSION TITAN-1
 ### **Autonomous Satellite Monitoring & AI Command Console**
 
 ![ORBIT-X Hero Banner](assets/hero_banner.png)
@@ -20,7 +20,7 @@
 ---
 
 ## 🌌 1. MISSION OVERVIEW
-**ORBIT-X** is a next-generation command ecosystem designed for the **TITAN-1 Mission**. It operates as a high-fidelity bridge between low-level IoT telemetry and high-level AI-driven decision-making. Utilizing **Hybrid Edge Computing**, the system ensures 100% mission uptime by processing critical data locally while maintaining global synchronization via the cloud.
+**ORBIT-X (AGRILINKSAT)** is a next-generation command ecosystem designed for the **TITAN-1 Mission**. It operates as a high-fidelity bridge between low-level IoT telemetry and high-level AI-driven decision-making. Utilizing **Hybrid Edge Computing**, the system ensures 100% mission uptime by processing critical data locally while maintaining global synchronization via the cloud.
 
 ### **Key Objectives**
 - 🛡️ **Autonomous Resilience**: Zero-latency anomaly detection and mitigation.

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('--- ORBIT-X SYSTEM HEALTH CHECK ---');
+console.log('--- ORBIT-X (AGRILINKSAT) SYSTEM HEALTH CHECK ---');
 console.log('Timestamp:', new Date().toISOString());
 console.log('------------------------------------\n');
 

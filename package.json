@@ -1,7 +1,7 @@
 {
   "name": "orbit-x",
   "version": "1.0.0",
-  "description": "ORBIT-X - Autonomous Satellite Monitoring & AI Command Console",
+  "description": "ORBIT-X (AGRILINKSAT) - Autonomous Satellite Monitoring & AI Command Console",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.orbitx.dashboard",
-    "productName": "Orbit-X",
+    "productName": "Orbit-X (AGRILINKSAT)",
     "artifactName": "Orbit-X.${ext}",
     "directories": {
       "output": "release"

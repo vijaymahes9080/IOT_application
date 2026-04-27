@@ -5,7 +5,7 @@ color 0b
 echo.
 echo  ###################################################
 echo  #                                                 #
-echo  #             ORBIT-X NEURAL ECOSYSTEM            #
+echo  #             ORBIT-X (AGRILINKSAT)             #
 echo  #          DEPENDENCY INSTALLATION MODULE         #
 echo  #                                                 #
 echo  ###################################################
