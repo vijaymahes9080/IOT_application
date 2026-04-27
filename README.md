@@ -129,7 +129,13 @@ For detailed engineering specs, refer to:
 ## 🔗 9. PROJECT LINKS
 - **Main Repository**: [github.com/vijaymahes9080/IOT_application](https://github.com/vijaymahes9080/IOT_application)
 - **Hosted Frontend**: [Orbit-X Web Hub](https://vijaymahes9080.github.io/IOT_application/)
-- **Hardware Simulation**: [Wokwi Project Simulation](https://wokwi.com/projects/306ddcf8-857e-4240-b742-4a6389a0dc2a)
+- **Hardware Simulation**: [Watch Live Simulation Video](docs/wokwi/sat%20simulation.mp4)
+
+<div align="center">
+  <video src="docs/wokwi/sat%20simulation.mp4" width="100%" controls>
+    Your browser does not support the video tag.
+  </video>
+</div>
 
 ---
 
