@@ -1,6 +1,8 @@
 # ORBIT-X: Autonomous Satellite Monitoring & AI Command Console
 ## MISSION: TITAN-1
 
+![ORBIT-X Poster](docs/iot%20poster.PNG)
+
 ---
 
 ### 1. INTRODUCTION
@@ -25,6 +27,8 @@ Key objectives of ORBIT-X include:
 - **MQTT (ThingsBoard)**: Protocol for remote telemetry streaming and global model weight synchronization.
 
 #### **Hardware Components (AgriNode System)**
+![Hardware Setup](docs/image.jpeg)
+
 - **ESP32 Microcontroller**: The heart of the hardware node, handling Wi-Fi/Serial communication.
 - **MPU6050 (IMU)**: Provides 3-axis Gyroscope and Accelerometer data for orientation tracking.
 - **Soil Moisture Sensor**: Real-time monitoring of ground conditions for automated irrigation.

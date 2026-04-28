@@ -3,6 +3,8 @@
 
 ![ORBIT-X Hero Banner](assets/hero_banner.png)
 
+![ORBIT-X Poster](docs/iot%20poster.PNG)
+
 <div align="center">
 
 [![Mission Status](https://img.shields.io/badge/Mission-TITAN--1%20Nominal-00e5ff?style=for-the-badge&logo=spacex)](https://github.com/vijaymahes9080/IOT_application)
@@ -87,6 +89,8 @@ A 50-unit **Long Short-Term Memory** network forecasts battery health and orbita
 ---
 
 ## 🏗️ 5. HARDWARE CONFIGURATION
+![Hardware Setup](docs/image.jpeg)
+
 The **AgriNode** system is built on a custom ESP32 backbone, integrating professional-grade sensors:
 
 - 🧭 **MPU6050**: 6-Axis Inertial Measurement (IMU).
