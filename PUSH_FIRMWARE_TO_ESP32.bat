@@ -10,14 +10,14 @@ echo ===========================================================================
 echo.
 
 :: 1. Locate Arduino CLI Tool
-set CLI_PATH=%~dp0scratch\tools\arduino-cli\arduino-cli.exe
+set "CLI_PATH=%~dp0scratch\tools\arduino-cli\arduino-cli.exe"
 if not exist "%CLI_PATH%" (
-    set CLI_PATH=%~dp0tools\arduino-cli\arduino-cli.exe
+    set "CLI_PATH=%~dp0tools\arduino-cli\arduino-cli.exe"
 )
 if not exist "%CLI_PATH%" (
     where arduino-cli >nul 2>&1
     if !errorlevel! equ 0 (
-        set CLI_PATH=arduino-cli
+        set "CLI_PATH=arduino-cli"
     ) else (
         color 0C
         echo [ERROR] arduino-cli.exe was not found!
@@ -38,19 +38,19 @@ if !errorlevel! equ 0 (
 ) else (
     echo       No conflicting Electron process running.
 )
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 
-:: 3. Detect Connected Board & COM Port
+:: 3. Detect Connected Board and COM Port
 echo.
 echo [2/4] Detecting connected ESP32 board...
-set TARGET_PORT=COM4
+set "TARGET_PORT=COM4"
 
 for /f "tokens=1,2,3" %%A in ('"%CLI_PATH%" board list') do (
     echo %%A | findstr /i "COM" >nul
     if !errorlevel! equ 0 (
-        set DETECTED_PORT=%%A
+        set "DETECTED_PORT=%%A"
         echo       Found connected serial port: !DETECTED_PORT!
-        set TARGET_PORT=!DETECTED_PORT!
+        set "TARGET_PORT=!DETECTED_PORT!"
     )
 )
 echo [OK] Target Port set to: %TARGET_PORT%
@@ -66,7 +66,7 @@ if !errorlevel! neq 0 (
     color 0C
     echo.
     echo ==============================================================================
-    echo [ERROR] Compilation failed! Review preprocessor / syntax errors above.
+    echo [ERROR] Compilation failed! Review preprocessor or syntax errors above.
     echo ==============================================================================
     echo.
     if "%~1"=="" pause
@@ -86,7 +86,7 @@ if !errorlevel! neq 0 (
     echo ==============================================================================
     echo [ERROR] Upload failed on %TARGET_PORT%!
     echo - Check USB cable connection.
-    echo - Ensure no other application (Serial Monitor / Putty) is using %TARGET_PORT%.
+    echo - Ensure no other application such as Serial Monitor or Putty is using %TARGET_PORT%.
     echo - Press and hold BOOT button on ESP32 if connecting times out.
     echo ==============================================================================
     echo.
@@ -102,16 +102,16 @@ echo ===========================================================================
 echo.
 echo The ESP32 is now running with:
 echo  - 25 FPS Master OLED Sliding Carousel with Cubic Ease-Out
-echo  - Real-Time VPD, Dew Point & Biosphere Vitality Calculations
+echo  - Real-Time VPD, Dew Point and Biosphere Vitality Calculations
 echo  - Multi-Channel 16-Sample Dynamic History Sparklines
-echo  - Live Sonar Radiating Radar & VL53L0X Target Lock Animations
+echo  - Live Sonar Radiating Radar and VL53L0X Target Lock Animations
 echo  - Non-blocking 500ms JSON Telemetry and Two-Way Acoustic Command Bridge
 echo.
 
 if "%~1"=="--auto" goto auto_launch
 if "%~1"=="--no-launch" goto finish
 
-set /p LAUNCH_APP="Would you like to start the desktop app now? (Y/N, default Y): "
+set /p LAUNCH_APP="Would you like to start the desktop app now? [Y/N, default Y]: "
 if /i "%LAUNCH_APP%"=="N" goto finish
 
 :auto_launch
@@ -120,5 +120,5 @@ start "" node "%~dp0launch.js"
 goto finish
 
 :finish
-echo.
+echo Flashing operation complete.
 if "%~1"=="" pause
