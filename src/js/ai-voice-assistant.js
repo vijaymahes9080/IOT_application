@@ -729,3 +729,4 @@ class AgriVoiceAssistant {
 document.addEventListener("DOMContentLoaded", () => {
     window.agriVoiceAssistant = new AgriVoiceAssistant();
 });
+
