@@ -10,9 +10,9 @@ echo ===========================================================================
 echo.
 
 :: 1. Locate Arduino CLI Tool
-set "CLI_PATH=%~dp0scratch\tools\arduino-cli\arduino-cli.exe"
+set "CLI_PATH=%~dp0tools\arduino-cli\arduino-cli.exe"
 if not exist "%CLI_PATH%" (
-    set "CLI_PATH=%~dp0tools\arduino-cli\arduino-cli.exe"
+    set "CLI_PATH=%~dp0scratch\tools\arduino-cli\arduino-cli.exe"
 )
 if not exist "%CLI_PATH%" (
     where arduino-cli >nul 2>&1
@@ -21,7 +21,7 @@ if not exist "%CLI_PATH%" (
     ) else (
         color 0C
         echo [ERROR] arduino-cli.exe was not found!
-        echo Please ensure scratch\tools\arduino-cli\arduino-cli.exe is present.
+        echo Please ensure tools\arduino-cli\arduino-cli.exe is present.
         echo.
         if "%~1"=="" pause
         exit /b 1
