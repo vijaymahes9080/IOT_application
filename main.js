@@ -509,8 +509,20 @@ app.whenReady().then(() => {
   ipcMain.handle('get-hardware-status', () => {
     return { 
       status: serialClient?.hardwareStatus || 'simulated',
-      lastKnownPort: serialClient?.lastConnectedPort || null
+      lastKnownPort: serialClient?.lastConnectedPort || null,
+      lastTelemetryTime: serialClient?.lastDataTime || 0
     };
+  });
+
+  ipcMain.handle('get-latest-telemetry', () => {
+    return serialClient?.getLatestSnapshot?.() || null;
+  });
+
+  ipcMain.handle('send-hardware-command', (event, command) => {
+    if (typeof command === 'string' && /^[A-Za-z0-9_:]+$/.test(command)) {
+      return serialClient?.sendCommand?.(command) || false;
+    }
+    return false;
   });
 
   app.on('activate', () => {

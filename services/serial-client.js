@@ -283,6 +283,14 @@ async function findAndOpenPort() {
                         return undefined;
                     };
                     const p_temp1 = pick('temp1', 'temperature1', 'temp', 'temperature', 'soilTemp');
+                    if (pick('soil_pct', 'soilPct') !== undefined) buffer.soilMoisture = pick('soil_pct', 'soilPct');
+                    if (pick('soil_raw', 'soilRaw') !== undefined) buffer.soilRaw = pick('soil_raw', 'soilRaw');
+                    if (pick('ultra_cm', 'ultraCm') !== undefined) buffer.ultrasonic = pick('ultra_cm', 'ultraCm');
+                    if (pick('laser_mm', 'laserMm', 'tof') !== undefined) buffer.laserDistance = pick('laser_mm', 'laserMm', 'tof');
+                    if (pick('lat') !== undefined) buffer.lat = pick('lat');
+                    if (pick('lon') !== undefined) buffer.lon = pick('lon');
+                    if (pick('gps_fix') !== undefined) buffer.gpsFix = pick('gps_fix');
+                    if (pick('alert') !== undefined) buffer.activeAlert = pick('alert');
                     const p_temp2 = pick('temp2', 'temperature2', 'ambientTemp');
                     if (p_temp1 !== undefined) buffer.temp1 = p_temp1;
                     if (p_temp2 !== undefined) buffer.temp2 = p_temp2;
@@ -334,6 +342,8 @@ async function findAndOpenPort() {
 
                             console.log(`[SERIAL] ✅ Data Emitted: ${JSON.stringify(snap)}`);
                             emitter.emit('raw', JSON.stringify(snap));
+                            emitter.latestSnapshot = standardized;
+                            emitter.lastDataTime = Date.now();
                             dbMgr.logTelemetry(standardized);
                             emitter.emit('telemetry', standardized);
 
@@ -416,3 +426,31 @@ emitter.stop = () => {
 };
 
 module.exports = emitter;
+
+
+emitter.latestSnapshot = null;
+emitter.lastDataTime = 0;
+
+emitter.getLatestSnapshot = () => {
+    return {
+        data: emitter.latestSnapshot,
+        lastDataTime: emitter.lastDataTime,
+        status: emitter.hardwareStatus,
+        port: emitter.lastConnectedPort,
+        isFresh: (Date.now() - emitter.lastDataTime) < 4000
+    };
+};
+
+emitter.sendCommand = (command) => {
+    if (port && port.isOpen) {
+        try {
+            port.write(command + '\n');
+            console.log('[SERIAL] Sent command: ' + command);
+            return true;
+        } catch (err) {
+            console.error('[SERIAL] Command error: ' + err.message);
+            return false;
+        }
+    }
+    return false;
+};

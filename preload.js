@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onAIModelSync: (callback) => ipcRenderer.on('ai-model-sync', (_event, update) => callback(update)),
     onHardwareStatusUpdate: (callback) => ipcRenderer.on('hardware-status-update', (_event, info) => callback(info)),
     getHardwareStatus: () => ipcRenderer.invoke('get-hardware-status'),
+    getLatestTelemetry: () => ipcRenderer.invoke('get-latest-telemetry'),
+    sendHardwareCommand: (command) => ipcRenderer.invoke('send-hardware-command', command),
     getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });
-
