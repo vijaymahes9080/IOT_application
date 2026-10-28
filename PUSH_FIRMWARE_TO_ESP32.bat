@@ -23,7 +23,7 @@ if not exist "%CLI_PATH%" (
         echo [ERROR] arduino-cli.exe was not found!
         echo Please ensure scratch\tools\arduino-cli\arduino-cli.exe is present.
         echo.
-        pause
+        if "%~1"=="" pause
         exit /b 1
     )
 )
@@ -69,7 +69,7 @@ if !errorlevel! neq 0 (
     echo [ERROR] Compilation failed! Review preprocessor / syntax errors above.
     echo ==============================================================================
     echo.
-    pause
+    if "%~1"=="" pause
     exit /b 1
 )
 color 0A
@@ -90,7 +90,7 @@ if !errorlevel! neq 0 (
     echo - Press and hold BOOT button on ESP32 if connecting times out.
     echo ==============================================================================
     echo.
-    pause
+    if "%~1"=="" pause
     exit /b 1
 )
 
@@ -108,13 +108,17 @@ echo  - Live Sonar Radiating Radar & VL53L0X Target Lock Animations
 echo  - Non-blocking 500ms JSON Telemetry and Two-Way Acoustic Command Bridge
 echo.
 
-set /p LAUNCH_APP="Would you like to start the desktop app now? (Y/N, default Y): "
-if /i "%LAUNCH_APP%"=="N" (
-    echo Flashing complete. Exiting.
-) else (
-    echo Launching Desktop Application...
-    start "" node "%~dp0launch.js"
-)
+if "%~1"=="--auto" goto auto_launch
+if "%~1"=="--no-launch" goto finish
 
+set /p LAUNCH_APP="Would you like to start the desktop app now? (Y/N, default Y): "
+if /i "%LAUNCH_APP%"=="N" goto finish
+
+:auto_launch
+echo Launching Desktop Application...
+start "" node "%~dp0launch.js"
+goto finish
+
+:finish
 echo.
-pause
+if "%~1"=="" pause

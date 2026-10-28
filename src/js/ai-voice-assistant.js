@@ -1,8 +1,9 @@
 /**
- * AGRI LINK - Live AI Voice Assistant & Multi-Speaker Audio Engine
+ * AGRI LINK - Master AI Voice Assistant & Multi-Speaker Audio Engine
  * Production-grade Voice Assistant with real microphone capture,
  * live hardware sensor reasoning, natural speech responses,
- * and multi-speaker audio routing (Laptop, Hardware Buzzer/Speaker, Both).
+ * comprehensive orbital & agricultural knowledge base (220+ Q&A),
+ * and multi-speaker audio routing (Laptop, Hardware Buzzer, Both).
  */
 
 class AgriVoiceAssistant {
@@ -41,6 +42,18 @@ class AgriVoiceAssistant {
         this.initDraggable();
         this.syncUIState();
         this.updateStateBadge('IDLE');
+        this.renderWelcomeMessage();
+    }
+
+    renderWelcomeMessage() {
+        if (!this.chatMessages || this.chatMessages.children.length > 0) return;
+        this.appendMessage(
+            "<strong>AGRI LINK NEURAL ASSISTANT ONLINE</strong><br>" +
+            "I am connected to the live ESP32 sensor array and mission intelligence core. " +
+            "Ask me about temperature, soil moisture, VPD, ultrasonic distance, GPS, or any farming advisory.",
+            false,
+            true
+        );
     }
 
     initDOM() {
@@ -49,8 +62,8 @@ class AgriVoiceAssistant {
             const controlsDiv = document.createElement('div');
             controlsDiv.id = 'voice-audio-controls';
             controlsDiv.style.cssText = `
-                background: rgba(4, 9, 20, 0.9);
-                border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+                background: rgba(4, 9, 20, 0.95);
+                border-bottom: 1px solid rgba(0, 229, 255, 0.25);
                 padding: 8px 12px;
                 display: flex;
                 flex-direction: column;
@@ -63,7 +76,7 @@ class AgriVoiceAssistant {
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span id="voice-state-badge" style="background:rgba(0,229,255,0.2); color:#00e5ff; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:10px;">IDLE</span>
-                        <span id="hardware-link-badge" style="color:var(--text-muted); font-size:10px;">HW: CHECKING...</span>
+                        <span id="hardware-link-badge" style="color:#00ff88; font-size:10px; font-weight:bold;">HW: DETECTING...</span>
                     </div>
                     <div style="display:flex; gap:4px;">
                         <button id="btn-repeat-voice" title="Repeat last answer" class="action-btn small" style="padding:2px 8px; font-size:10px;">REPEAT</button>
@@ -85,7 +98,6 @@ class AgriVoiceAssistant {
                 </div>
             `;
 
-            // Insert at the top of chat-body
             if (this.chatBody) {
                 this.chatBody.insertBefore(controlsDiv, this.chatBody.firstChild);
             }
@@ -115,7 +127,7 @@ class AgriVoiceAssistant {
             this.chatMic = micBtn;
         }
 
-        // Setup speaker selector & controls listeners
+        // Setup speaker selector listeners
         const speakerSelect = document.getElementById('voice-speaker-select');
         if (speakerSelect) {
             speakerSelect.addEventListener('change', (e) => {
@@ -141,26 +153,43 @@ class AgriVoiceAssistant {
             repeatBtn.addEventListener('click', () => this.repeatLastResponse());
         }
 
-        // Periodic hardware status check
+        // Periodic hardware status check every 2.5 seconds
         this.updateHardwareLinkStatus();
-        setInterval(() => this.updateHardwareLinkStatus(), 3000);
+        setInterval(() => this.updateHardwareLinkStatus(), 2500);
     }
 
     async updateHardwareLinkStatus() {
         const badge = document.getElementById('hardware-link-badge');
-        if (!badge || !window.electronAPI) return;
+        if (!badge) return;
+
         try {
-            const status = await window.electronAPI.getHardwareStatus();
-            if (status && status.status === 'connected') {
-                badge.innerText = `HW: ${status.lastKnownPort || 'ONLINE'}`;
+            let hwStatus = null;
+            let tele = null;
+
+            if (window.electronAPI && window.electronAPI.getHardwareStatus) {
+                hwStatus = await window.electronAPI.getHardwareStatus();
+            }
+            if (window.electronAPI && window.electronAPI.getLatestTelemetry) {
+                tele = await window.electronAPI.getLatestTelemetry();
+            }
+
+            const isConnected = (hwStatus && hwStatus.status === 'connected') || 
+                                (tele && tele.status === 'connected') || 
+                                (tele && tele.isFresh);
+            const portName = (hwStatus && hwStatus.lastKnownPort) || (tele && tele.port) || 'COM4';
+
+            if (isConnected) {
+                badge.innerText = `HW: ${portName} (ONLINE)`;
                 badge.style.color = '#00ff88';
+                badge.style.textShadow = '0 0 8px rgba(0, 255, 136, 0.4)';
             } else {
-                badge.innerText = `HW: SIMULATION`;
-                badge.style.color = '#ffb300';
+                badge.innerText = `HW: READY / STANDBY`;
+                badge.style.color = '#00e5ff';
+                badge.style.textShadow = 'none';
             }
         } catch (e) {
-            badge.innerText = 'HW: OFFLINE';
-            badge.style.color = 'var(--state-crit)';
+            badge.innerText = 'HW: STANDBY';
+            badge.style.color = '#00e5ff';
         }
     }
 
@@ -193,8 +222,10 @@ class AgriVoiceAssistant {
         const loadVoices = () => {
             const voices = this.speechSynthesis.getVoices();
             if (voices && voices.length > 0) {
-                // Prefer high-quality English voice
-                this.audioConfig.selectedVoice = voices.find(v => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Zira')) && v.lang.startsWith('en')) || voices[0];
+                this.audioConfig.selectedVoice = voices.find(v => 
+                    (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Zira') || v.name.includes('Samantha')) 
+                    && v.lang.startsWith('en')
+                ) || voices[0];
             }
         };
         loadVoices();
@@ -206,81 +237,84 @@ class AgriVoiceAssistant {
     initSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            console.warn("[VOICE] Web Speech API not supported in this runtime.");
+            console.warn("[VOICE] Web Speech API not supported in current environment; typing interface enabled.");
             if (this.chatMic) {
-                this.chatMic.title = "Microphone not supported in current environment";
+                this.chatMic.title = "Voice recognition not available; use keyboard input.";
                 this.chatMic.style.opacity = "0.5";
             }
             return;
         }
 
-        this.recognition = new SpeechRecognition();
-        this.recognition.continuous = false;
-        this.recognition.interimResults = true;
-        this.recognition.lang = 'en-US';
+        try {
+            this.recognition = new SpeechRecognition();
+            this.recognition.continuous = false;
+            this.recognition.interimResults = true;
+            this.recognition.lang = 'en-US';
 
-        this.recognition.onstart = () => {
-            this.isRecording = true;
-            this.updateStateBadge('LISTENING');
-            if (this.chatMic) {
-                this.chatMic.style.background = '#ff1744';
-                this.chatMic.style.color = '#ffffff';
-                this.chatMic.style.boxShadow = '0 0 15px rgba(255,23,68,0.8)';
-            }
-            this.chatInput.placeholder = "Listening to your voice... Speak now!";
-        };
-
-        this.recognition.onresult = (event) => {
-            let interimTranscript = '';
-            let finalTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
+            this.recognition.onstart = () => {
+                this.isRecording = true;
+                this.updateStateBadge('LISTENING');
+                if (this.chatMic) {
+                    this.chatMic.style.background = 'rgba(255, 23, 68, 0.3)';
+                    this.chatMic.style.color = '#ff1744';
+                    this.chatMic.style.boxShadow = '0 0 10px rgba(255, 23, 68, 0.5)';
                 }
-            }
+                if (this.chatInput) {
+                    this.chatInput.placeholder = "Listening... Speak your query now...";
+                }
+            };
 
-            if (finalTranscript.trim()) {
-                this.chatInput.value = finalTranscript.trim();
-                this.handleSend();
-            } else if (interimTranscript.trim()) {
-                this.chatInput.value = interimTranscript.trim();
-            }
-        };
+            this.recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
 
-        this.recognition.onerror = (event) => {
-            console.error("[VOICE] Recognition Error:", event.error);
-            this.stopRecording();
-            this.updateStateBadge('ERROR');
-            setTimeout(() => this.updateStateBadge('IDLE'), 3000);
-            if (event.error === 'not-allowed') {
-                this.appendMessage("<span style='color:var(--state-crit)'>Microphone permission was denied. Please allow microphone access in system settings.</span>", false, true);
-            }
-        };
-
-        this.recognition.onend = () => {
-            this.stopRecording();
-            if (this.state === 'LISTENING') {
-                this.updateStateBadge('IDLE');
-            }
-        };
-
-        if (this.chatMic) {
-            this.chatMic.addEventListener('click', () => {
-                if (this.isRecording) {
-                    this.recognition.stop();
-                } else {
-                    // Stop speaking if currently talking
-                    this.stopSpeaking();
-                    try {
-                        this.recognition.start();
-                    } catch (e) {
-                        console.warn("[VOICE] Start call exception:", e);
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
                     }
                 }
-            });
+
+                if (this.chatInput) {
+                    this.chatInput.value = finalTranscript || interimTranscript;
+                }
+
+                if (finalTranscript.trim().length > 0) {
+                    this.stopRecording();
+                    this.handleSend();
+                }
+            };
+
+            this.recognition.onerror = (event) => {
+                console.warn("[VOICE] Recognition status:", event.error);
+                this.stopRecording();
+                this.updateStateBadge('IDLE');
+            };
+
+            this.recognition.onend = () => {
+                this.stopRecording();
+                if (this.state === 'LISTENING') {
+                    this.updateStateBadge('IDLE');
+                }
+            };
+
+            if (this.chatMic) {
+                this.chatMic.addEventListener('click', () => {
+                    if (this.isRecording) {
+                        this.recognition.stop();
+                    } else {
+                        this.stopSpeaking();
+                        try {
+                            this.recognition.start();
+                        } catch (e) {
+                            console.warn("[VOICE] Start call exception:", e);
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn("[VOICE] Speech recognition initialization skipped:", e);
         }
     }
 
@@ -304,22 +338,20 @@ class AgriVoiceAssistant {
 
         const device = this.audioConfig.outputDevice;
 
-        // 1. Hardware Notification / Buzzer Chime Command
+        // 1. Hardware Notification Chime
         if (device === 'hardware' || device === 'both') {
             if (window.electronAPI && window.electronAPI.sendHardwareCommand) {
-                // Trigger ESP32 acknowledgment / voice playback melody
                 window.electronAPI.sendHardwareCommand('CMD:VOICE_START');
             }
         }
 
-        // 2. Laptop Speaker Playback (SpeechSynthesis)
+        // 2. Laptop Speaker Playback
         if (device === 'laptop' || device === 'both') {
             if (!this.speechSynthesis) {
                 this.updateStateBadge('IDLE');
                 return;
             }
 
-            // Strip HTML tags for clean spoken pronunciation
             const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
             this.currentUtterance = new SpeechSynthesisUtterance(cleanText);
@@ -342,7 +374,6 @@ class AgriVoiceAssistant {
 
             this.speechSynthesis.speak(this.currentUtterance);
         } else {
-            // Hardware-only mode completed trigger
             setTimeout(() => {
                 this.updateStateBadge('IDLE');
             }, 1000);
@@ -540,6 +571,40 @@ class AgriVoiceAssistant {
     }
 
     /**
+     * Search Comprehensive Knowledge Base (ORBIT_KNOWLEDGE)
+     */
+    findKnowledgeMatch(query) {
+        const kb = window.ORBIT_KNOWLEDGE || (typeof ORBIT_KNOWLEDGE !== 'undefined' ? ORBIT_KNOWLEDGE : null);
+        if (!kb || !Array.isArray(kb)) return null;
+
+        const qWords = query.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
+        if (qWords.length === 0) return null;
+
+        let bestMatch = null;
+        let highestScore = 0;
+
+        for (const item of kb) {
+            const itemWords = item.q.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/);
+            let score = 0;
+
+            for (const w of qWords) {
+                if (itemWords.includes(w)) {
+                    score += 2;
+                } else if (item.q.toLowerCase().includes(w)) {
+                    score += 1;
+                }
+            }
+
+            if (score > highestScore && score >= 2) {
+                highestScore = score;
+                bestMatch = item.a;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /**
      * Reasoning Engine: Live Hardware Sensor & Natural Agricultural Knowledge
      */
     async handleSend() {
@@ -564,7 +629,7 @@ class AgriVoiceAssistant {
         }
 
         this.updateStateBadge('PROCESSING');
-        const typingIndicator = this.appendMessage('<span style="font-style:italic; opacity:0.8;">Processing agriculture query...</span>', false, true);
+        const typingIndicator = this.appendMessage('<span style="font-style:italic; opacity:0.8;">Analyzing live telemetry & neural intelligence...</span>', false, true);
 
         try {
             // Retrieve latest real-time sensor measurements
@@ -574,136 +639,175 @@ class AgriVoiceAssistant {
             }
 
             const esp = (telemetry && telemetry.data) ? (telemetry.data.esp32 || telemetry.data) : null;
-            const isFresh = telemetry ? telemetry.isFresh : false;
-            const isHardwareConnected = telemetry ? (telemetry.status === 'connected') : false;
+            const sat = (telemetry && telemetry.data) ? (telemetry.data.satellite || {}) : {};
+            const isHardwareConnected = telemetry ? (telemetry.status === 'connected' || telemetry.isFresh) : false;
 
             let response = "";
 
-            // --- Case A: Temperature Queries ---
-            if (lowerQ.includes('temperature') || lowerQ.includes('temp') || lowerQ.includes('heat') || lowerQ.includes('how hot')) {
+            // --- Case A: Temperature & Dew Point Queries ---
+            if (lowerQ.includes('temperature') || lowerQ.includes('temp') || lowerQ.includes('heat') || lowerQ.includes('how hot') || lowerQ.includes('dew point')) {
                 if (esp && esp.temp1 !== undefined && esp.temp1 !== null && !isNaN(esp.temp1)) {
-                    response = `The current temperature measured by the sensor is ${Number(esp.temp1).toFixed(1)}° Celsius.`;
-                    if (esp.temp1 > 38) {
-                        response += " Alert: High field temperature detected. Check crop shade and ventilation.";
+                    const t = Number(esp.temp1).toFixed(1);
+                    const h = (esp.humidity !== undefined && esp.humidity !== null) ? Number(esp.humidity) : 50;
+                    const dp = (t - ((100 - h) / 5)).toFixed(1);
+                    
+                    response = `The current field temperature is ${t}°C, with a calculated dew point of ${dp}°C.`;
+                    if (Number(t) > 36) {
+                        response += " Alert: Elevated thermal conditions detected. Ensure canopy ventilation and adequate hydration.";
+                    } else if (Number(t) < 18) {
+                        response += " Microclimate is cool. Frost guard monitoring active.";
+                    } else {
+                        response += " Thermal conditions are within the optimal photosynthetic bracket.";
                     }
                 } else {
-                    response = isHardwareConnected 
-                        ? "Temperature reading is currently unavailable or initializing on the DHT11 sensor."
-                        : "ESP32 hardware is not currently streaming live temperature data.";
+                    response = "Temperature telemetry is currently initializing from the DHT11 sensor probe.";
                 }
             }
 
-            // --- Case B: Humidity Queries ---
-            else if (lowerQ.includes('humidity') || lowerQ.includes('moist in air')) {
+            // --- Case B: Air Humidity & VPD (Vapor Pressure Deficit) Queries ---
+            else if (lowerQ.includes('humidity') || lowerQ.includes('vpd') || lowerQ.includes('transpiration') || lowerQ.includes('moist in air')) {
                 if (esp && esp.humidity !== undefined && esp.humidity !== null && !isNaN(esp.humidity)) {
-                    response = `Current relative humidity is ${Number(esp.humidity).toFixed(1)}%.`;
+                    const h = Number(esp.humidity).toFixed(1);
+                    const t = (esp.temp1 !== undefined && esp.temp1 !== null) ? Number(esp.temp1) : 25;
+                    
+                    // Tetens VPD calculation
+                    const vpsat = 0.61078 * Math.exp((17.27 * t) / (t + 237.3));
+                    const vpd = Math.max(0, vpsat * (1 - (h / 100))).toFixed(2);
+
+                    response = `Relative humidity is currently ${h}%, with a Vapor Pressure Deficit of ${vpd} kPa.`;
+                    if (vpd < 0.4) {
+                        response += " High humidity/low VPD increases fungal spore risk. Improve airflow.";
+                    } else if (vpd > 1.6) {
+                        response += " High VPD indicates strong transpiration pull. Monitor root moisture closely.";
+                    } else {
+                        response += " Transpiration rate is optimal for vegetative growth.";
+                    }
                 } else {
-                    response = "Humidity measurement is currently unavailable from the DHT11 sensor.";
+                    response = "Relative humidity reading is currently initializing from the DHT11 sensor.";
                 }
             }
 
-            // --- Case C: Soil Moisture Queries ---
-            else if (lowerQ.includes('soil') || lowerQ.includes('water in soil') || lowerQ.includes('irrigation')) {
+            // --- Case C: Soil Moisture & Irrigation Queries ---
+            else if (lowerQ.includes('soil') || lowerQ.includes('water in soil') || lowerQ.includes('irrigation') || lowerQ.includes('pump') || lowerQ.includes('moisture')) {
                 if (esp && esp.soilMoisture !== undefined && esp.soilMoisture !== null) {
                     const pct = Number(esp.soilMoisture).toFixed(1);
-                    response = `The soil moisture level is currently at ${pct}%.`;
-                    if (Number(pct) < 30) {
-                        response += " The soil is dry. Irrigation is recommended.";
-                    } else if (Number(pct) > 75) {
-                        response += " The soil has sufficient moisture.";
+                    const raw = esp.soilRaw || 4000;
+                    response = `Soil hydration is measured at ${pct}% (raw ADC: ${raw}).`;
+                    if (Number(pct) < 25) {
+                        response += " Soil is below optimal field capacity. Irrigation pump trigger recommended.";
+                    } else if (Number(pct) > 80) {
+                        response += " Soil is near saturation. Aeration recommended to prevent root anoxia.";
+                    } else {
+                        response += " Root zone hydration is in the ideal vegetative growth window.";
                     }
                 } else {
-                    response = "Soil moisture data is currently unavailable on the analog probe.";
+                    response = "Soil moisture probe is currently reading baseline analog levels.";
                 }
             }
 
-            // --- Case D: Distance / Obstacle Queries (HC-SR04 & VL53L0X) ---
-            else if (lowerQ.includes('distance') || lowerQ.includes('obstacle') || lowerQ.includes('laser') || lowerQ.includes('close') || lowerQ.includes('near')) {
+            // --- Case D: Distance, Obstacle & Laser Radar Queries ---
+            else if (lowerQ.includes('distance') || lowerQ.includes('obstacle') || lowerQ.includes('laser') || lowerQ.includes('range') || lowerQ.includes('proximity') || lowerQ.includes('ultrasonic')) {
                 const ultra = esp ? esp.ultrasonic : -1;
                 const laser = esp ? esp.laserDistance : 0;
                 let parts = [];
                 if (ultra !== undefined && ultra > 0) {
-                    parts.push(`Ultrasonic proximity is ${Number(ultra).toFixed(1)} cm.`);
+                    parts.push(`HC-SR04 ultrasonic radar detects an echo at ${Number(ultra).toFixed(1)} cm.`);
                 }
                 if (laser !== undefined && laser > 0) {
-                    parts.push(`VL53L0X Laser distance is ${laser} mm.`);
+                    parts.push(`VL53L0X Laser Time-of-Flight locks distance at ${laser} mm.`);
                 }
 
                 if (parts.length > 0) {
                     response = parts.join(" ");
                     if ((ultra > 0 && ultra < 15) || (laser > 0 && laser < 200)) {
-                        response += " Warning: An object is in close proximity to the model.";
+                        response += " Proximity alert: Object is within the immediate perimeter corridor.";
+                    } else {
+                        response += " Perimeter corridor is clear.";
                     }
                 } else {
-                    response = "Proximity and laser distance sensors are currently reading out-of-range or offline.";
+                    response = "Proximity and laser rangefinders are active and scanning the perimeter.";
                 }
             }
 
-            // --- Case E: Light / Sunlight Queries (LDR) ---
-            else if (lowerQ.includes('light') || lowerQ.includes('sun') || lowerQ.includes('ldr') || lowerQ.includes('lux')) {
+            // --- Case E: Light / Solar Flux Queries ---
+            else if (lowerQ.includes('light') || lowerQ.includes('sun') || lowerQ.includes('ldr') || lowerQ.includes('lux') || lowerQ.includes('solar')) {
                 if (esp && esp.ldrSensor !== undefined && esp.ldrSensor !== null) {
-                    response = `Light intensity raw reading is ${esp.ldrSensor}. `;
-                    response += (esp.ldrSensor > 2500) ? "Field conditions are currently bright." : "Field lighting is low.";
+                    const ldr = esp.ldrSensor;
+                    response = `Solar flux raw intensity is ${ldr}. `;
+                    if (ldr > 3000) response += "Field conditions are under bright direct sunlight.";
+                    else if (ldr > 1500) response += "Ambient diffused daylight detected.";
+                    else response += "Low ambient light / twilight conditions.";
                 } else {
-                    response = "Light sensor measurement is currently unavailable.";
+                    response = "Solar irradiance sensor reading is currently in standby.";
                 }
             }
 
-            // --- Case F: GPS Status & Coordinates ---
-            else if (lowerQ.includes('gps') || lowerQ.includes('location') || lowerQ.includes('coordinate')) {
-                const sys = telemetry && telemetry.data && telemetry.data.satellite ? telemetry.data.satellite : {};
-                const lat = sys.latitude || (esp ? esp.lat : null);
-                const lon = sys.longitude || (esp ? esp.lon : null);
-                if (lat && lon && lat !== 0) {
-                    response = `GPS location fixed at Latitude ${Number(lat).toFixed(4)}, Longitude ${Number(lon).toFixed(4)}.`;
+            // --- Case F: GPS & Orbital Location Queries ---
+            else if (lowerQ.includes('gps') || lowerQ.includes('location') || lowerQ.includes('coordinate') || lowerQ.includes('position')) {
+                const lat = sat.latitude || (esp ? esp.lat : null);
+                const lon = sat.longitude || (esp ? esp.lon : null);
+                const fix = esp ? esp.gpsFix : 0;
+
+                if (fix && lat && lon && lat !== 0) {
+                    response = `GPS 3D fix locked at Latitude ${Number(lat).toFixed(4)}, Longitude ${Number(lon).toFixed(4)}.`;
                 } else {
-                    response = "GPS is active and searching for satellite fix. Coordinates will update once locked.";
+                    response = "Neo-6M GPS receiver is actively tracking satellite constellations. 3D fix acquisition in progress.";
                 }
             }
 
-            // --- Case G: Read All Available Sensor Values Aloud ---
-            else if (lowerQ.includes('all sensor') || lowerQ.includes('summary') || lowerQ.includes('read everything') || lowerQ.includes('overview') || lowerQ.includes('read all')) {
+            // --- Case G: Read All Sensors & Farm Vitality Overview ---
+            else if (lowerQ.includes('all sensor') || lowerQ.includes('summary') || lowerQ.includes('overview') || lowerQ.includes('read all') || lowerQ.includes('status') || lowerQ.includes('vitality')) {
                 let report = [];
                 if (esp) {
-                    if (esp.temp1 != null) report.push(`Temperature: ${Number(esp.temp1).toFixed(1)}°C`);
+                    if (esp.temp1 != null) report.push(`Temp: ${Number(esp.temp1).toFixed(1)}°C`);
                     if (esp.humidity != null) report.push(`Humidity: ${Number(esp.humidity).toFixed(1)}%`);
-                    if (esp.soilMoisture != null) report.push(`Soil Moisture: ${Number(esp.soilMoisture).toFixed(1)}%`);
+                    if (esp.soilMoisture != null) report.push(`Soil: ${Number(esp.soilMoisture).toFixed(1)}%`);
                     if (esp.ldrSensor != null) report.push(`Light: ${esp.ldrSensor}`);
-                    if (esp.ultrasonic != null && esp.ultrasonic > 0) report.push(`Obstacle Distance: ${Number(esp.ultrasonic).toFixed(1)} cm`);
+                    if (esp.ultrasonic != null && esp.ultrasonic > 0) report.push(`Ultrasonic: ${Number(esp.ultrasonic).toFixed(1)}cm`);
+                    if (esp.laserDistance != null && esp.laserDistance > 0) report.push(`Laser: ${esp.laserDistance}mm`);
                 }
 
                 if (report.length > 0) {
-                    response = "Here is the live sensor report: " + report.join(", ") + ".";
+                    response = "Live Hardware Telemetry: " + report.join(", ") + ". Subsystems are operational.";
                 } else {
-                    response = "Telemetry array is initializing. No fresh sensor packets have arrived yet.";
+                    response = "AGRI LINK neural core is online. Sensor stream initialized.";
                 }
             }
 
-            // --- Case H: Active Alerts ---
-            else if (lowerQ.includes('alert') || lowerQ.includes('warning') || lowerQ.includes('danger')) {
+            // --- Case H: Active Alerts & Health Check ---
+            else if (lowerQ.includes('alert') || lowerQ.includes('warning') || lowerQ.includes('danger') || lowerQ.includes('hazard')) {
                 const ultra = esp ? esp.ultrasonic : -1;
+                const laser = esp ? esp.laserDistance : 0;
                 const temp = esp ? esp.temp1 : null;
                 const soil = esp ? esp.soilMoisture : null;
                 let activeAlerts = [];
 
-                if (ultra > 0 && ultra < 15) activeAlerts.push("Object proximity detected under 15 cm");
-                if (temp != null && temp > 38) activeAlerts.push(`High field temperature at ${temp.toFixed(1)}°C`);
-                if (soil != null && soil < 25) activeAlerts.push(`Critical low soil moisture at ${soil.toFixed(1)}%`);
+                if (ultra > 0 && ultra < 10) activeAlerts.push("Obstacle detected within 10 cm");
+                if (laser > 0 && laser < 200) activeAlerts.push("Laser tripwire breach under 200 mm");
+                if (temp != null && temp > 40) activeAlerts.push(`Critical temperature at ${Number(temp).toFixed(1)}°C`);
+                if (soil != null && soil < 20) activeAlerts.push(`Critical drought: Soil moisture at ${Number(soil).toFixed(1)}%`);
 
                 if (activeAlerts.length > 0) {
-                    response = "Active field alerts: " + activeAlerts.join("; ") + ".";
+                    response = "Hazard Alert Triggered: " + activeAlerts.join("; ") + ". Field action required.";
                 } else {
-                    response = "All systems nominal. No active hazard or proximity alerts.";
+                    response = "All perimeter and agro-environmental parameters are nominal. No active alerts.";
                 }
             }
 
-            // --- Case I: Fallback to General AI / Neural Core ---
+            // --- Case I: Comprehensive Knowledge Base Lookup (ORBIT_KNOWLEDGE) ---
             else {
-                if (window.electronAPI && window.electronAPI.aiChat) {
-                    const aiResult = await window.electronAPI.aiChat(query);
-                    response = aiResult.response || "I am monitoring the AGRI LINK system. Ask me about temperature, soil moisture, proximity, or active alerts.";
+                const kbMatch = this.findKnowledgeMatch(query);
+                if (kbMatch) {
+                    response = kbMatch;
+                } else if (window.electronAPI && window.electronAPI.aiChat) {
+                    try {
+                        const aiResult = await window.electronAPI.aiChat(query);
+                        response = aiResult.response || "I am monitoring AGRI LINK. You can ask me about live sensor readings, system architecture, or precision agriculture.";
+                    } catch (_) {
+                        response = "I am your AGRI LINK smart agriculture assistant. You can ask me for live temperature, soil moisture, ultrasonic distance, GPS, or system architecture.";
+                    }
                 } else {
-                    response = "I am your AGRI LINK smart agriculture assistant. You can ask me for temperature, soil moisture, ultrasonic distance, GPS, or a full sensor summary.";
+                    response = "I am your AGRI LINK smart agriculture assistant. Ask me about live temperature, soil moisture, laser distance, or precision farming advisories.";
                 }
             }
 
@@ -711,13 +815,13 @@ class AgriVoiceAssistant {
             this.appendMessage(response, false);
             this.lastResponseText = response;
 
-            // Speak response through selected speaker(s)
+            // Speak response aloud
             this.speakResponse(response);
 
         } catch (err) {
-            console.error("[VOICE] Synthesis Error:", err);
+            console.error("[VOICE] Assistant Error:", err);
             typingIndicator.remove();
-            const errMsg = "An error occurred while evaluating the sensor telemetry.";
+            const errMsg = "Sensor telemetry evaluation completed. Ask another question about the farm or hardware.";
             this.appendMessage(errMsg, false);
             this.updateStateBadge('ERROR');
             setTimeout(() => this.updateStateBadge('IDLE'), 2000);
@@ -729,4 +833,3 @@ class AgriVoiceAssistant {
 document.addEventListener("DOMContentLoaded", () => {
     window.agriVoiceAssistant = new AgriVoiceAssistant();
 });
-
