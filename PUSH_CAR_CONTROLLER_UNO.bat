@@ -26,22 +26,16 @@ if not exist "%CLI_PATH%" (
 echo [OK] Using Arduino CLI: "%CLI_PATH%"
 echo.
 
-:: 2. Auto-Detect Connected Port
+:: 2. Auto-Detect Connected Port via Windows Serial APIs
 set "TARGET_PORT="
-for /f "tokens=1,2,3" %%A in ('"%CLI_PATH%" board list') do (
-    echo %%A | findstr /i "COM" >nul
-    if !errorlevel! equ 0 (
-        set "TARGET_PORT=%%A"
-        echo       Detected active hardware serial port: !TARGET_PORT!
-    )
+for /f "tokens=*" %%P in ('powershell -NoProfile -Command "[System.IO.Ports.SerialPort]::GetPortNames()"') do (
+    set "TARGET_PORT=%%P"
 )
-
-if "%TARGET_PORT%"=="" (
-    set "TARGET_PORT=COM7"
-    echo [INFO] Defaulting to target port: COM7
-) else (
-    echo [OK] Target Port set to: %TARGET_PORT%
-)
+if "%TARGET_PORT%"=="" set "TARGET_PORT=COM6"
+echo [OK] Detected Active Serial Port: %TARGET_PORT%
+set /p USER_PORT="Use port %TARGET_PORT% (press Enter) or type port name (e.g. COM6): "
+if not "%USER_PORT%"=="" set "TARGET_PORT=%USER_PORT%"
+echo Target set to: %TARGET_PORT%
 echo.
 
 :: 3. Select Board Type
@@ -129,3 +123,4 @@ echo  SUCCESS: Car Controller Firmware successfully uploaded to %TARGET_PORT%!
 echo ==============================================================================
 echo.
 pause
+
