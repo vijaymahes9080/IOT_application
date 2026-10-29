@@ -62,38 +62,39 @@ class AgriVoiceAssistant {
             const controlsDiv = document.createElement('div');
             controlsDiv.id = 'voice-audio-controls';
             controlsDiv.style.cssText = `
-                background: rgba(4, 9, 20, 0.95);
-                border-bottom: 1px solid rgba(0, 229, 255, 0.25);
-                padding: 8px 12px;
+                background: rgba(6, 12, 24, 0.98);
+                border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+                padding: 6px 12px;
                 display: flex;
                 flex-direction: column;
-                gap: 6px;
+                gap: 5px;
                 font-family: var(--font-mono, monospace);
                 font-size: 11px;
+                flex-shrink: 0;
             `;
 
             controlsDiv.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span id="voice-state-badge" style="background:rgba(0,229,255,0.2); color:#00e5ff; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:10px;">IDLE</span>
+                        <span id="voice-state-badge" style="background:rgba(0,229,255,0.2); color:#00e5ff; border:1px solid rgba(0,229,255,0.4); padding:2px 7px; border-radius:3px; font-weight:bold; font-size:10px;">IDLE</span>
                         <span id="hardware-link-badge" style="color:#00ff88; font-size:10px; font-weight:bold;">HW: DETECTING...</span>
                     </div>
-                    <div style="display:flex; gap:4px;">
-                        <button id="btn-repeat-voice" title="Repeat last answer" class="action-btn small" style="padding:2px 8px; font-size:10px;">REPEAT</button>
-                        <button id="btn-stop-voice" title="Stop speaking" class="action-btn small" style="padding:2px 8px; font-size:10px; border-color:var(--state-crit); color:var(--state-crit);">STOP</button>
+                    <div style="display:flex; gap:5px;">
+                        <button id="btn-repeat-voice" title="Repeat last answer" class="chat-hdr-btn" style="font-size:9.5px; padding:2px 6px;">REPEAT</button>
+                        <button id="btn-stop-voice" title="Stop speaking" class="chat-hdr-btn" style="font-size:9.5px; padding:2px 6px; border-color:var(--state-crit, #ff3366); color:var(--state-crit, #ff3366);">STOP</button>
                     </div>
                 </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <label style="color:var(--text-muted); font-size:10px; font-weight:bold; min-width:65px; flex-shrink:0; white-space:nowrap;">SPEAKER:</label>
-                    <select id="voice-speaker-select" style="background:#0a1224; color:#00e5ff; border:1px solid rgba(0,229,255,0.3); border-radius:3px; font-size:10px; padding:2px 6px; flex:1; min-width:140px;">
+                    <label style="color:#8ba3c7; font-size:10px; font-weight:700; flex-shrink:0;">SPEAKER:</label>
+                    <select id="voice-speaker-select" style="background:#0b1528; color:#00e5ff; border:1px solid rgba(0,229,255,0.35); border-radius:4px; font-size:10px; padding:3px 6px; flex:1; outline:none;">
                         <option value="laptop">Laptop Speaker (Voice)</option>
-                        <option value="hardware">ESP32 Buzzer (Acoustic Chime)</option>
-                        <option value="both">Both (Laptop Voice + HW Chime)</option>
+                        <option value="hardware">ESP32 Buzzer (HW Chime)</option>
+                        <option value="both">Both (Laptop + HW Chime)</option>
                     </select>
-                    <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer; flex-shrink:0;" title="Automatically speak answers aloud">
-                        <input type="checkbox" id="voice-auto-speak" checked>
-                        <span>AUTO</span>
+                    <label style="display:flex; align-items:center; gap:4px; font-size:10px; color:#8ba3c7; cursor:pointer; flex-shrink:0;" title="Automatically speak answers aloud">
+                        <input type="checkbox" id="voice-auto-speak" checked style="accent-color:#00e5ff;">
+                        <span style="font-weight:700;">AUTO</span>
                     </label>
                 </div>
             `;
@@ -443,6 +444,24 @@ class AgriVoiceAssistant {
                 this.toggleChat();
             });
         }
+        const btnClear = document.getElementById('btn-chat-clear');
+        if (btnClear) {
+            btnClear.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.chatMessages) {
+                    this.chatMessages.innerHTML = '';
+                    this.renderWelcomeMessage();
+                }
+            });
+        }
+        const btnResetPos = document.getElementById('btn-chat-reset-pos');
+        if (btnResetPos) {
+            btnResetPos.addEventListener('click', (e) => {
+                e.stopPropagation();
+                localStorage.removeItem('orbit-chatbot-pos');
+                this.setDefaultPosition();
+            });
+        }
         if (this.chatSend) {
             this.chatSend.addEventListener('click', () => this.handleSend());
         }
@@ -543,18 +562,20 @@ class AgriVoiceAssistant {
         if (!this.chatBody || !this.chatbot || !this.chatToggle) return;
         if (this.isOpen) {
             this.chatBody.style.display = 'flex';
-            this.chatBody.style.height = '420px';
+            this.chatBody.style.height = '480px';
             this.chatBody.style.opacity = '1';
-            this.chatbot.style.width = '360px';
+            this.chatbot.style.width = '380px';
             this.chatToggle.innerText = '▼';
-            this.chatHeader.style.padding = '10px 16px';
-            this.chatHeader.style.borderBottom = '1px solid rgba(0, 229, 255, 0.2)';
+            this.chatToggle.title = 'Minimize Assistant';
+            this.chatHeader.style.padding = '10px 14px';
+            this.chatHeader.style.borderBottom = '1px solid rgba(0, 229, 255, 0.25)';
         } else {
             this.chatBody.style.height = '0';
             this.chatBody.style.opacity = '0';
-            this.chatbot.style.width = '240px';
+            this.chatbot.style.width = '260px';
             setTimeout(() => { if (!this.isOpen) this.chatBody.style.display = 'none'; }, 300);
             this.chatToggle.innerText = '▲';
+            this.chatToggle.title = 'Expand Assistant';
             this.chatHeader.style.borderBottom = 'none';
             this.chatHeader.style.padding = '8px 12px';
         }
@@ -564,27 +585,54 @@ class AgriVoiceAssistant {
         if (!this.chatMessages) return null;
         const msgDiv = document.createElement('div');
         msgDiv.className = isUser ? 'user-msg' : 'ai-msg';
-        msgDiv.style.alignSelf = isUser ? 'flex-end' : 'flex-start';
-        msgDiv.style.background = isUser ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)';
-        msgDiv.style.border = isUser ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)';
-        msgDiv.style.padding = '10px 14px';
-        msgDiv.style.borderRadius = isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px';
-        msgDiv.style.color = '#fff';
-        msgDiv.style.maxWidth = '88%';
-        msgDiv.style.fontSize = '12px';
-        msgDiv.style.lineHeight = '1.45';
-        msgDiv.style.wordBreak = 'break-word';
-        msgDiv.style.marginBottom = '8px';
 
+        // Sender Header badge with timestamp
+        const headerDiv = document.createElement('div');
+        headerDiv.className = `msg-header ${isUser ? 'user' : 'ai'}`;
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        headerDiv.innerHTML = `<span>${isUser ? '👤 YOU' : '🛰️ AGRI LINK NEURAL AI'}</span><span style="opacity:0.6; font-size:9px; font-weight:normal;">${timeStr}</span>`;
+        msgDiv.appendChild(headerDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'msg-content';
         if (isHTML) {
-            msgDiv.innerHTML = text;
+            contentDiv.innerHTML = text;
         } else {
-            msgDiv.innerText = text;
+            contentDiv.innerText = text;
         }
+        msgDiv.appendChild(contentDiv);
 
         this.chatMessages.appendChild(msgDiv);
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        try {
+            this.chatMessages.scrollTo({ top: this.chatMessages.scrollHeight, behavior: 'smooth' });
+        } catch (_) {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
         return msgDiv;
+    }
+
+    showTypingIndicator() {
+        if (!this.chatMessages) return null;
+        const indDiv = document.createElement('div');
+        indDiv.className = 'ai-msg typing-indicator-msg';
+        indDiv.innerHTML = `
+            <div class="msg-header ai">
+                <span>🛰️ AGRI LINK NEURAL AI</span>
+            </div>
+            <div class="typing-indicator">
+                <span>Evaluating telemetry & reasoning</span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+            </div>
+        `;
+        this.chatMessages.appendChild(indDiv);
+        try {
+            this.chatMessages.scrollTo({ top: this.chatMessages.scrollHeight, behavior: 'smooth' });
+        } catch (_) {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
+        return indDiv;
     }
 
     /**
@@ -647,7 +695,7 @@ class AgriVoiceAssistant {
 
         this.updateStateBadge('PROCESSING');
         this.sendHardwareCmd('CMD:STATE:THINK');
-        const typingIndicator = this.appendMessage('<span style="font-style:italic; opacity:0.8;">Analyzing live telemetry & neural intelligence...</span>', false, true);
+        const typingIndicator = this.showTypingIndicator();
 
         try {
             // Retrieve latest real-time sensor measurements

@@ -261,10 +261,14 @@
     <div id="orbit-chatbot">
         <div id="chat-header">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span class="green">●</span>
-                <span class="mono cyan" style="font-weight:bold;">AGRI LINK AI ASSISTANT</span>
+                <span class="green pulse-dot" style="font-size:10px;">●</span>
+                <span class="mono cyan" style="font-weight:bold; font-size:11.5px; letter-spacing:0.5px;">AGRI LINK AI ASSISTANT</span>
             </div>
-            <button id="chat-toggle">▲</button>
+            <div class="chat-header-actions">
+                <button id="btn-chat-reset-pos" class="chat-hdr-btn" title="Reset window position" style="font-size:11px;">⌖</button>
+                <button id="btn-chat-clear" class="chat-hdr-btn" title="Clear chat messages" style="font-size:11px;">🗑</button>
+                <button id="chat-toggle" class="chat-hdr-btn" title="Minimize / Expand" style="font-size:11px;">▼</button>
+            </div>
         </div>
         <div id="chat-body">
             <div id="chat-messages"></div>
