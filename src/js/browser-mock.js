@@ -163,12 +163,28 @@
         aiChat: async (query) => {
             try {
                 const snap = generateTelemetrySnapshot();
-                const res = await fetch('http://127.0.0.1:5005/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, telemetry: snap })
-                });
-                if (res.ok) {
+                let res = null;
+                // Attempt 1: Via same-origin proxy /chat (avoids CORS)
+                try {
+                    res = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query, telemetry: snap })
+                    });
+                } catch (_) {}
+
+                // Attempt 2: Direct to port 5005 if proxy unavailable
+                if (!res || !res.ok) {
+                    try {
+                        res = await fetch('http://127.0.0.1:5005/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query, telemetry: snap })
+                        });
+                    } catch (_) {}
+                }
+
+                if (res && res.ok) {
                     const data = await res.json();
                     if (data.response && !data.response.includes('EXTENDED_SEARCH_REQUIRED')) {
                         return data;

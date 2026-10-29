@@ -250,8 +250,10 @@ class AgriVoiceAssistant {
         if (!SpeechRecognition) {
             console.warn("[VOICE] Web Speech API not supported in current environment; typing interface enabled.");
             if (this.chatMic) {
-                this.chatMic.title = "Voice recognition not available; use keyboard input.";
-                this.chatMic.style.opacity = "0.5";
+                this.chatMic.title = "Voice recognition requires Chrome or Edge browser. Click for info.";
+                this.chatMic.addEventListener('click', () => {
+                    this.appendMessage("ℹ️ <strong>Voice Recognition</strong>: Speech recognition is supported in Google Chrome and Microsoft Edge on <code>http://localhost:8080/</code>. In this window, you can type your query in the input box below and press Enter!", false, true);
+                });
             }
             return;
         }
@@ -267,12 +269,13 @@ class AgriVoiceAssistant {
                 this.updateStateBadge('LISTENING');
                 this.sendHardwareCmd('CMD:STATE:LISTEN');
                 if (this.chatMic) {
-                    this.chatMic.style.background = 'rgba(255, 23, 68, 0.3)';
+                    this.chatMic.style.background = 'rgba(255, 23, 68, 0.4)';
                     this.chatMic.style.color = '#ff1744';
-                    this.chatMic.style.boxShadow = '0 0 10px rgba(255, 23, 68, 0.5)';
+                    this.chatMic.style.borderColor = '#ff1744';
+                    this.chatMic.style.boxShadow = '0 0 15px rgba(255, 23, 68, 0.8)';
                 }
                 if (this.chatInput) {
-                    this.chatInput.placeholder = "Listening... Speak your query now...";
+                    this.chatInput.placeholder = "🎙️ Listening... Speak your query clearly now...";
                 }
             };
 
@@ -302,6 +305,16 @@ class AgriVoiceAssistant {
                 console.warn("[VOICE] Recognition status:", event.error);
                 this.stopRecording();
                 this.updateStateBadge('IDLE');
+
+                if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+                    this.appendMessage("⚠️ <strong>Microphone Permission Blocked</strong>: Please click the camera/microphone icon in your browser address bar and choose <em>'Always allow'</em>, then click the mic button again.", false, true);
+                } else if (event.error === 'network') {
+                    this.appendMessage("⚠️ <strong>Voice Recognition Notice</strong>: Google Speech-to-Text network service could not be reached. You can type your query in the text box below and press Enter!", false, true);
+                } else if (event.error === 'no-speech') {
+                    if (this.chatInput) {
+                        this.chatInput.placeholder = "No speech detected. Click the mic button to try again...";
+                    }
+                }
             };
 
             this.recognition.onend = () => {
@@ -312,16 +325,36 @@ class AgriVoiceAssistant {
             };
 
             if (this.chatMic) {
-                this.chatMic.addEventListener('click', () => {
+                this.chatMic.addEventListener('click', async () => {
                     if (this.isRecording) {
                         this.recognition.stop();
-                    } else {
-                        this.stopSpeaking();
+                        return;
+                    }
+
+                    this.stopSpeaking();
+
+                    // Proactively request browser microphone permission prompt if needed
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                         try {
-                            this.recognition.start();
-                        } catch (e) {
-                            console.warn("[VOICE] Start call exception:", e);
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            stream.getTracks().forEach(t => t.stop());
+                        } catch (err) {
+                            console.warn("[VOICE] getUserMedia check:", err);
+                            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                                this.appendMessage("⚠️ <strong>Microphone Access Blocked</strong>: Please allow microphone permission in your browser address bar, then click the mic again.", false, true);
+                                return;
+                            }
                         }
+                    }
+
+                    try {
+                        this.recognition.start();
+                    } catch (e) {
+                        console.warn("[VOICE] Start call exception:", e);
+                        try {
+                            this.recognition.abort();
+                            setTimeout(() => this.recognition.start(), 200);
+                        } catch (_) {}
                     }
                 });
             }
@@ -880,7 +913,9 @@ class AgriVoiceAssistant {
                 } else {
                     // Direct browser mode HTTP fetch to Python AI Service
                     try {
-                        const res = await fetch('http://127.0.0.1:5005/chat', {
+                        let res = null;
+                        try { res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query, telemetry: telemetry }) }); } catch (_) {}
+                        if (!res || !res.ok) try { res = await fetch('http://127.0.0.1:5005/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ query: query, telemetry: telemetry })
