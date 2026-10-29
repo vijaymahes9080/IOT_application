@@ -107,6 +107,17 @@ int8_t humTrend = 0;
 int8_t soilTrend = 0;
 int8_t ldrTrend = 0;
 
+// ---------- Assistant State Machine (Bidirectional OLED Sync) ----------
+enum AssistantState {
+  ASSIST_IDLE = 0,
+  ASSIST_LISTENING = 1,
+  ASSIST_THINKING = 2,
+  ASSIST_SPEAKING = 3,
+  ASSIST_ERROR = 4
+};
+AssistantState currentAssistState = ASSIST_IDLE;
+unsigned long assistStateStartTime = 0;
+
 // ---------- Carousel & Alert State Machine ----------
 const int PAGE_COUNT = 9;
 uint8_t currentPage = 0;
@@ -486,34 +497,83 @@ void drawHeaderForPage(uint8_t pageIndex) {
 // Intelligent Offset-Aware Display Pages (y = 12..52)
 // ============================================================================
 
-// Page 0: Master Agro-Neural Brand, Diagnostics & Farm Health Score
+// Page 0: Master Animated AI Identity Core (Screen A)
 void page0(int16_t xOffset) {
-  display.drawBitmap(6 + xOffset, 14, bmp_shield_sprout, 16, 16, SSD1306_WHITE);
-  display.setTextSize(2);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(28 + xOffset, 13);
-  display.print("AGRI LINK");
+  // 1. Animated Cybernetic AI Face Matrix (x=44..84, y=14..36)
+  int16_t faceX = 44 + xOffset;
+  int16_t faceY = 14;
+  int16_t faceW = 40;
+  int16_t faceH = 22;
 
+  // Ambient breathing aura ring around AI face
+  uint8_t auraBreathe = (animationFrame / 6) % 3;
+  display.drawRoundRect(faceX - 2 - auraBreathe, faceY - 2 - auraBreathe, faceW + 4 + auraBreathe * 2, faceH + 4 + auraBreathe * 2, 4, SSD1306_WHITE);
+  display.fillRoundRect(faceX, faceY, faceW, faceH, 3, SSD1306_BLACK);
+  display.drawRoundRect(faceX, faceY, faceW, faceH, 3, SSD1306_WHITE);
+
+  // Corner micro-chevrons
+  display.drawPixel(faceX + 2, faceY + 2, SSD1306_WHITE);
+  display.drawPixel(faceX + faceW - 3, faceY + 2, SSD1306_WHITE);
+  display.drawPixel(faceX + 2, faceY + faceH - 3, SSD1306_WHITE);
+  display.drawPixel(faceX + faceW - 3, faceY + faceH - 3, SSD1306_WHITE);
+
+  // Blinking Cybernetic Digital Eye Matrices
+  // Blink triggered every ~85 frames (~3.4 seconds) for 5 frames
+  bool isBlinking = ((animationFrame % 85) < 5);
+  int16_t eyeW = 7;
+  int16_t eyeH = isBlinking ? 1 : 6;
+  int16_t eyeY = isBlinking ? (faceY + 10) : (faceY + 7);
+
+  // Left Eye
+  display.fillRect(faceX + 7, eyeY, eyeW, eyeH, SSD1306_WHITE);
+  if (!isBlinking) {
+    display.drawPixel(faceX + 9, eyeY + 2, SSD1306_BLACK); // Pupil
+  }
+
+  // Right Eye
+  display.fillRect(faceX + 26, eyeY, eyeW, eyeH, SSD1306_WHITE);
+  if (!isBlinking) {
+    display.drawPixel(faceX + 28, eyeY + 2, SSD1306_BLACK); // Pupil
+  }
+
+  // Subtle digital mouth/sensor bar
+  uint8_t mouthPulse = (animationFrame / 5) % 2;
+  display.drawFastHLine(faceX + 13, faceY + 16, 14, SSD1306_WHITE);
+  if (mouthPulse) {
+    display.drawFastHLine(faceX + 16, faceY + 17, 8, SSD1306_WHITE);
+  }
+
+  // Brand Name & Subsystem tags on left / right
   display.setTextSize(1);
-  display.setCursor(28 + xOffset, 29);
-  display.print("NEURAL FARM OS");
-
-  display.drawFastHLine(6 + xOffset, 39, 116, SSD1306_WHITE);
-
-  // Subsystems Status Badges & Biosphere Health Index
-  display.setCursor(6 + xOffset, 42);
-  display.print("DHT:");
-  display.print(isnan(temperatureC) ? "--" : "OK");
-
-  display.setCursor(44 + xOffset, 42);
-  display.print("LSR:");
-  display.print(laserReady ? "OK" : "--");
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(2 + xOffset, 16);
+  display.print("AGRI");
+  display.setCursor(2 + xOffset, 26);
+  display.print("LINK");
 
   uint8_t vScore = calculateVitalityIndex();
-  char vitalBuf[14];
-  snprintf(vitalBuf, sizeof(vitalBuf), "VITAL:%d%%", vScore);
+  display.setCursor(90 + xOffset, 16);
+  display.print("VITAL");
+  display.setCursor(90 + xOffset, 26);
+  display.print(vScore);
+  display.print("%");
+
+  // Environmental Ticker Bar at Bottom (y=39..50)
+  display.drawFastHLine(2 + xOffset, 39, 124, SSD1306_WHITE);
+  display.setCursor(4 + xOffset, 42);
+  display.print("T:");
+  if (isnan(temperatureC)) display.print("--"); else display.print((int)temperatureC);
+  display.print("C");
+
+  display.setCursor(42 + xOffset, 42);
+  display.print("H:");
+  if (isnan(humidityPct)) display.print("--"); else display.print((int)humidityPct);
+  display.print("%");
+
   display.setCursor(76 + xOffset, 42);
-  display.print(vitalBuf);
+  display.print("SOIL:");
+  display.print(calculateSoilPercent());
+  display.print("%");
 }
 
 // Page 1: Temperature, Dew Point & Dynamic Sparkline History
@@ -857,6 +917,158 @@ void renderPage(uint8_t index, int16_t xOffset) {
   }
 }
 
+// Screen B: Listening State with Dynamic Expanding Acoustic Ripples
+void pageListening() {
+  drawHeader("AI", "LISTENING...");
+
+  // Expanding Acoustic Concentric Ripples radiating from AI center (x=64, y=32)
+  for (int i = 0; i < 3; i++) {
+    int16_t r = 10 + (int16_t)(((animationFrame * 2) + (i * 9)) % 26);
+    if (r <= 25) {
+      display.drawCircle(64, 32, r, SSD1306_WHITE);
+    }
+  }
+
+  // Focused Receptive AI Face Core
+  display.fillRoundRect(50, 22, 28, 20, 3, SSD1306_BLACK);
+  display.drawRoundRect(50, 22, 28, 20, 3, SSD1306_WHITE);
+
+  // Wide open attentive eyes
+  display.fillRect(55, 27, 6, 6, SSD1306_WHITE);
+  display.drawPixel(57, 29, SSD1306_BLACK);
+  display.fillRect(67, 27, 6, 6, SSD1306_WHITE);
+  display.drawPixel(69, 29, SSD1306_BLACK);
+
+  // Attentive microphone aperture
+  display.drawFastHLine(61, 37, 6, SSD1306_WHITE);
+
+  // Pulsing Prompt Text (2 Hz)
+  if ((animationFrame / 8) % 2 == 0) {
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(18, 44);
+    display.print("[ SPEAK YOUR QUERY ]");
+  }
+
+  // Footer status
+  display.drawFastHLine(0, 53, 128, SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(12, 55);
+  display.print("MIC ACTIVE // 16kHz");
+}
+
+// Screen C: Neural Thinking State with 25 FPS Orbital Dots Trajectory
+void pageThinking() {
+  drawHeader("AI", "NEURAL INFERENCE");
+
+  int16_t cx = 64;
+  int16_t cy = 32;
+
+  // Glowing Neural Core
+  display.fillCircle(cx, cy, 5, SSD1306_WHITE);
+  display.drawCircle(cx, cy, 8, SSD1306_WHITE);
+
+  // 4 Orbital Neural Nodes revolving in elliptical trajectory
+  float theta = (float)animationFrame * 0.14f;
+  int16_t rx = 26;
+  int16_t ry = 13;
+
+  for (int i = 0; i < 4; i++) {
+    float angle = theta + (float)i * (PI / 2.0f);
+    int16_t nx = cx + (int16_t)(cosf(angle) * (float)rx);
+    int16_t ny = cy + (int16_t)(sinf(angle) * (float)ry);
+
+    display.fillCircle(nx, ny, 2, SSD1306_WHITE);
+    // Synapse beam connection
+    display.drawLine(cx, cy, nx, ny, SSD1306_WHITE);
+  }
+
+  // Animated Status Text
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(14, 44);
+  display.print("ANALYZING TELEMETRY");
+  uint8_t dots = (animationFrame / 5) % 4;
+  for (uint8_t d = 0; d < dots; d++) display.print(".");
+
+  // Footer status
+  display.drawFastHLine(0, 53, 128, SSD1306_WHITE);
+  display.setCursor(8, 55);
+  display.print("STATUS: RUNNING MODELS");
+}
+
+// Screen D: Speaking State with Dynamic Frequency Spectrum Voice Bars
+void pageSpeaking() {
+  drawHeader("AI", "AI TRANSMITTING");
+
+  // Center Animated Harmonic Voice Spectrum Bars (7 channels)
+  int16_t barW = 4;
+  int16_t barGap = 3;
+  int16_t startX = 64 - ((7 * (barW + barGap) - barGap) / 2);
+
+  for (int i = 0; i < 7; i++) {
+    int16_t bx = startX + i * (barW + barGap);
+    float wave = sinf((float)animationFrame * 0.35f + (float)i * 0.85f);
+    int16_t barH = 4 + (int16_t)(fabsf(wave) * 16.0f);
+    barH = constrain(barH, 3, 20);
+
+    display.fillRect(bx, 32 - (barH / 2), barW, barH, SSD1306_WHITE);
+  }
+
+  // Cybernetic Voice Aperture Brackets
+  display.drawFastVLine(startX - 8, 22, 21, SSD1306_WHITE);
+  display.drawFastHLine(startX - 8, 22, 4, SSD1306_WHITE);
+  display.drawFastHLine(startX - 8, 42, 4, SSD1306_WHITE);
+
+  display.drawFastVLine(startX + 48, 22, 21, SSD1306_WHITE);
+  display.drawFastHLine(startX + 45, 22, 4, SSD1306_WHITE);
+  display.drawFastHLine(startX + 45, 42, 4, SSD1306_WHITE);
+
+  // Status Tag
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(14, 44);
+  display.print("AUDIO SYNTHESIS LIVE");
+
+  // Footer status
+  display.drawFastHLine(0, 53, 128, SSD1306_WHITE);
+  display.setCursor(10, 55);
+  display.print("ROUTE: LAPTOP + BUZZER");
+}
+
+// Screen F: Assistant Error & Auto-Recovery State
+void pageError() {
+  display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(10, 2);
+  display.print("! ASSISTANT FAULT !");
+  display.setTextColor(SSD1306_WHITE);
+
+  display.drawRoundRect(8, 16, 112, 33, 3, SSD1306_WHITE);
+
+  // Error Cross
+  display.drawLine(18, 24, 28, 34, SSD1306_WHITE);
+  display.drawLine(28, 24, 18, 34, SSD1306_WHITE);
+  display.drawCircle(23, 29, 8, SSD1306_WHITE);
+
+  display.setTextSize(1);
+  display.setCursor(36, 21);
+  display.print("CMD TIMEOUT");
+  display.setCursor(36, 31);
+  display.print("RESYNCING TELEMETRY");
+
+  // Auto-recovery progress bar (3.0s window)
+  unsigned long elapsed = millis() - assistStateStartTime;
+  int16_t recoverPct = (int16_t)constrain((elapsed * 100) / 3000, 0, 100);
+  drawProgressBar(36, 41, 78, 5, recoverPct, -1);
+
+  display.drawFastHLine(0, 53, 128, SSD1306_WHITE);
+  display.setCursor(12, 55);
+  display.print("RESTORING SENSOR CORE");
+}
+
 // ============================================================================
 // Master Emergency Alert Screen with Flashing Hazard Header & Breached Metrics
 // ============================================================================
@@ -962,10 +1174,39 @@ float cubicEaseOut(float t) {
 void renderScreen() {
   display.clearDisplay();
 
+  // Emergency Alert Takeover (Obstacle, Laser tripwire, Overheat)
   if (activeAlert != 0) {
     isTransitioning = false;
     pageAlert();
-  } else if (isTransitioning) {
+  }
+  // Assistant Active States
+  else if (currentAssistState == ASSIST_LISTENING) {
+    if (millis() - assistStateStartTime > 15000) {
+      currentAssistState = ASSIST_IDLE;
+    } else {
+      pageListening();
+    }
+  } else if (currentAssistState == ASSIST_THINKING) {
+    if (millis() - assistStateStartTime > 15000) {
+      currentAssistState = ASSIST_IDLE;
+    } else {
+      pageThinking();
+    }
+  } else if (currentAssistState == ASSIST_SPEAKING) {
+    if (millis() - assistStateStartTime > 15000) {
+      currentAssistState = ASSIST_IDLE;
+    } else {
+      pageSpeaking();
+    }
+  } else if (currentAssistState == ASSIST_ERROR) {
+    if (millis() - assistStateStartTime > 3000) {
+      currentAssistState = ASSIST_IDLE;
+    } else {
+      pageError();
+    }
+  }
+  // Carousel Transitions
+  else if (isTransitioning) {
     unsigned long elapsed = millis() - transitionStartTime;
     if (elapsed >= TRANSITION_DURATION_MS) {
       isTransitioning = false;
@@ -1144,12 +1385,35 @@ void processIncomingSerialCommands() {
     if (c == '\n' || c == '\r') {
       serialCommandBuffer.trim();
       if (serialCommandBuffer.length() > 0) {
-        if (serialCommandBuffer == "CMD:CHIME" || serialCommandBuffer == "CMD:SPEAK") {
+        if (serialCommandBuffer == "CMD:STATE:LISTEN") {
+          currentAssistState = ASSIST_LISTENING;
+          assistStateStartTime = millis();
+        } else if (serialCommandBuffer == "CMD:STATE:THINK") {
+          currentAssistState = ASSIST_THINKING;
+          assistStateStartTime = millis();
+        } else if (serialCommandBuffer == "CMD:STATE:SPEAK") {
+          currentAssistState = ASSIST_SPEAKING;
+          assistStateStartTime = millis();
+        } else if (serialCommandBuffer == "CMD:STATE:IDLE") {
+          currentAssistState = ASSIST_IDLE;
+        } else if (serialCommandBuffer == "CMD:STATE:ERROR") {
+          currentAssistState = ASSIST_ERROR;
+          assistStateStartTime = millis();
+          playBuzzerPattern(2);
+        } else if (serialCommandBuffer == "CMD:CHIME" || serialCommandBuffer == "CMD:SPEAK") {
           playBuzzerPattern(1);
         } else if (serialCommandBuffer == "CMD:VOICE_START") {
           playBuzzerPattern(3);
         } else if (serialCommandBuffer == "CMD:ALERT") {
           playBuzzerPattern(2);
+        } else if (serialCommandBuffer == "CMD:PAGE:NEXT") {
+          currentPage = (currentPage + 1) % PAGE_COUNT;
+          currentAssistState = ASSIST_IDLE;
+          lastPageChange = millis();
+        } else if (serialCommandBuffer == "CMD:PAGE:PREV") {
+          currentPage = (currentPage + PAGE_COUNT - 1) % PAGE_COUNT;
+          currentAssistState = ASSIST_IDLE;
+          lastPageChange = millis();
         } else if (serialCommandBuffer == "CMD:PING") {
           Serial.println("{\"status\":\"PONG\",\"device\":\"AGRI_LINK_ESP32\"}");
         }
@@ -1235,8 +1499,8 @@ void loop() {
     sendTelemetryPacket();
   }
 
-  // Advance pages every 5 seconds when no alert is active
-  if (activeAlert == 0 && !isTransitioning && (now - lastPageChange >= PAGE_INTERVAL_MS)) {
+  // Advance pages every 5 seconds when no alert and no assistant interaction is active
+  if (activeAlert == 0 && currentAssistState == ASSIST_IDLE && !isTransitioning && (now - lastPageChange >= PAGE_INTERVAL_MS)) {
     isTransitioning = true;
     transitionFromPage = currentPage;
     transitionToPage = (currentPage + 1) % PAGE_COUNT;
