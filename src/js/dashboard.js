@@ -66,7 +66,7 @@ const telemetrySources = [
     { id: 'soilMoisture', label: 'SOIL-M (%)', initial: 50.0, history: [], minLimit: 30, maxLimit: 80 },
     { id: 'ldrSensor', label: 'LIGHT', initial: 500, history: [], minLimit: 100, maxLimit: 900 },
     { id: 'ultrasonic', label: 'DISTANCE (CM)', initial: 100.0, history: [], minLimit: 10, maxLimit: 400 },
-    { id: 'battv', label: 'BATT-V (V)', initial: 14.1, history: [], minLimit: 11.5, maxLimit: 15.0 },
+    { id: 'battv', label: 'BATT VOLT', initial: 14.1, history: [14.1], minLimit: 11.5, maxLimit: 15.0 },
     { id: 'current', label: 'CURRENT (A)', initial: 2.54, history: [], minLimit: 0, maxLimit: 5.0 },
     { id: 'solarp', label: 'SOLAR-P (W)', initial: 85.0, history: [], minLimit: 0, maxLimit: 120.0 },
     { id: 'gyrox', label: 'GYRO-X', initial: 0.02, history: [], minLimit: -1, maxLimit: 1 },
@@ -202,7 +202,7 @@ function initTelemetry() {
                         </div>
                     </div>
                     <div class="tel-stats" id="tt-${src.id}-${index}">
-                        MIN: -- | MAX: --
+                        <span class="muted" style="font-size:9px">MIN:</span> -- <span class="muted" style="margin-left:5px; font-size:9px">MAX:</span> --
                     </div>
                     <canvas class="sparkline-canvas" id="spark-${src.id}-${index}"></canvas>
                 `;
@@ -563,7 +563,7 @@ function initTeleGridLarge() {
                     <span class="value cyan" id="val-large-${src.id}">${src.initial.toFixed(2)}</span>
                 </div>
                 <div class="tel-stats" id="tt-large-${src.id}" style="margin-bottom:10px;">
-                    MIN: -- | MAX: --
+                    <span class="muted" style="font-size:9px">MIN:</span> -- <span class="muted" style="margin-left:5px; font-size:9px">MAX:</span> --
                 </div>
                 <canvas class="sparkline-canvas" id="spark-large-${src.id}" style="height:60px;"></canvas>
             </div>

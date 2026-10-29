@@ -85,13 +85,13 @@ class AgriVoiceAssistant {
                 </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <label style="color:var(--text-muted); font-size:10px;">SPEAKER:</label>
-                    <select id="voice-speaker-select" style="background:#0a1224; color:#00e5ff; border:1px solid rgba(0,229,255,0.3); border-radius:3px; font-size:10px; padding:2px 6px; flex:1;">
-                        <option value="laptop">Laptop Speaker</option>
-                        <option value="hardware">Hardware Speaker / Buzzer</option>
-                        <option value="both">Both Speakers (Laptop + HW)</option>
+                    <label style="color:var(--text-muted); font-size:10px; font-weight:bold; min-width:65px; flex-shrink:0; white-space:nowrap;">SPEAKER:</label>
+                    <select id="voice-speaker-select" style="background:#0a1224; color:#00e5ff; border:1px solid rgba(0,229,255,0.3); border-radius:3px; font-size:10px; padding:2px 6px; flex:1; min-width:140px;">
+                        <option value="laptop">Laptop Speaker (Voice)</option>
+                        <option value="hardware">ESP32 Buzzer (Acoustic Chime)</option>
+                        <option value="both">Both (Laptop Voice + HW Chime)</option>
                     </select>
-                    <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer;" title="Automatically speak answers aloud">
+                    <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer; flex-shrink:0;" title="Automatically speak answers aloud">
                         <input type="checkbox" id="voice-auto-speak" checked>
                         <span>AUTO</span>
                     </label>
@@ -193,6 +193,16 @@ class AgriVoiceAssistant {
         }
     }
 
+    sendHardwareCmd(cmd) {
+        if (window.electronAPI && typeof window.electronAPI.sendHardwareCommand === 'function') {
+            try {
+                window.electronAPI.sendHardwareCommand(cmd);
+            } catch (e) {
+                console.warn("[VOICE] Hardware cmd dispatch error:", e);
+            }
+        }
+    }
+
     updateStateBadge(newState) {
         this.state = newState;
         const badge = document.getElementById('voice-state-badge');
@@ -254,6 +264,7 @@ class AgriVoiceAssistant {
             this.recognition.onstart = () => {
                 this.isRecording = true;
                 this.updateStateBadge('LISTENING');
+                this.sendHardwareCmd('CMD:STATE:LISTEN');
                 if (this.chatMic) {
                     this.chatMic.style.background = 'rgba(255, 23, 68, 0.3)';
                     this.chatMic.style.color = '#ff1744';
@@ -319,6 +330,9 @@ class AgriVoiceAssistant {
     }
 
     stopRecording() {
+        if (this.isRecording && this.state === 'LISTENING') {
+            this.sendHardwareCmd('CMD:STATE:IDLE');
+        }
         this.isRecording = false;
         if (this.chatMic) {
             this.chatMic.style.background = 'rgba(0, 229, 255, 0.15)';
@@ -335,20 +349,20 @@ class AgriVoiceAssistant {
 
         this.stopSpeaking();
         this.updateStateBadge('SPEAKING');
+        this.sendHardwareCmd('CMD:STATE:SPEAK');
 
         const device = this.audioConfig.outputDevice;
 
-        // 1. Hardware Notification Chime
+        // 1. Hardware Notification Chime (ESP32 Piezo Buzzer)
         if (device === 'hardware' || device === 'both') {
-            if (window.electronAPI && window.electronAPI.sendHardwareCommand) {
-                window.electronAPI.sendHardwareCommand('CMD:VOICE_START');
-            }
+            this.sendHardwareCmd('CMD:VOICE_START');
         }
 
-        // 2. Laptop Speaker Playback
+        // 2. Laptop Speaker Playback (Synthesized Voice)
         if (device === 'laptop' || device === 'both') {
             if (!this.speechSynthesis) {
                 this.updateStateBadge('IDLE');
+                this.sendHardwareCmd('CMD:STATE:IDLE');
                 return;
             }
 
@@ -364,19 +378,23 @@ class AgriVoiceAssistant {
             this.currentUtterance.onend = () => {
                 this.currentUtterance = null;
                 this.updateStateBadge('IDLE');
+                this.sendHardwareCmd('CMD:STATE:IDLE');
             };
 
             this.currentUtterance.onerror = (err) => {
                 console.error("[TTS] Playback Error:", err);
                 this.currentUtterance = null;
                 this.updateStateBadge('IDLE');
+                this.sendHardwareCmd('CMD:STATE:IDLE');
             };
 
             this.speechSynthesis.speak(this.currentUtterance);
         } else {
+            // Hardware Buzzer Only mode: acoustic chime played above, reset to idle after 1.5s
             setTimeout(() => {
                 this.updateStateBadge('IDLE');
-            }, 1000);
+                this.sendHardwareCmd('CMD:STATE:IDLE');
+            }, 1500);
         }
     }
 
@@ -387,6 +405,7 @@ class AgriVoiceAssistant {
         this.currentUtterance = null;
         if (this.state === 'SPEAKING') {
             this.updateStateBadge('IDLE');
+            this.sendHardwareCmd('CMD:STATE:IDLE');
         }
     }
 
@@ -399,16 +418,14 @@ class AgriVoiceAssistant {
 
     announceDeviceSwitch(target) {
         const msg = target === 'laptop' 
-            ? "Audio output switched to Laptop Speaker."
+            ? "Audio output switched to Laptop Speaker (Synthesized Voice)."
             : target === 'hardware'
-            ? "Audio output routed to ESP32 Hardware Speaker/Buzzer."
-            : "Audio output routed to Both Speakers (Laptop + Hardware).";
+            ? "Audio output routed to ESP32 Hardware Buzzer (Acoustic Chime). Voice synthesis remains active on Laptop."
+            : "Audio output routed to Both (Laptop Synthesized Voice + ESP32 Buzzer Chime).";
         
         this.appendMessage(`<span style='color:#00ff88'>${msg}</span>`, false, true);
         if (target === 'hardware' || target === 'both') {
-            if (window.electronAPI && window.electronAPI.sendHardwareCommand) {
-                window.electronAPI.sendHardwareCommand('CMD:CHIME');
-            }
+            this.sendHardwareCmd('CMD:CHIME');
         }
     }
 
@@ -629,6 +646,7 @@ class AgriVoiceAssistant {
         }
 
         this.updateStateBadge('PROCESSING');
+        this.sendHardwareCmd('CMD:STATE:THINK');
         const typingIndicator = this.appendMessage('<span style="font-style:italic; opacity:0.8;">Analyzing live telemetry & neural intelligence...</span>', false, true);
 
         try {
@@ -802,12 +820,34 @@ class AgriVoiceAssistant {
                 } else if (window.electronAPI && window.electronAPI.aiChat) {
                     try {
                         const aiResult = await window.electronAPI.aiChat(query);
-                        response = aiResult.response || "I am monitoring AGRI LINK. You can ask me about live sensor readings, system architecture, or precision agriculture.";
+                        const rawResp = (aiResult && aiResult.response) ? aiResult.response : "";
+                        if (rawResp && !rawResp.includes('EXTENDED_SEARCH_REQUIRED')) {
+                            response = rawResp;
+                        } else {
+                            response = "I am monitoring AGRI LINK. Live sensor telemetry is active. You can ask for temperature, soil moisture, crop advisory, or system architecture.";
+                        }
                     } catch (_) {
                         response = "I am your AGRI LINK smart agriculture assistant. You can ask me for live temperature, soil moisture, ultrasonic distance, GPS, or system architecture.";
                     }
                 } else {
-                    response = "I am your AGRI LINK smart agriculture assistant. Ask me about live temperature, soil moisture, laser distance, or precision farming advisories.";
+                    // Direct browser mode HTTP fetch to Python AI Service
+                    try {
+                        const res = await fetch('http://127.0.0.1:5005/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query: query })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.response && !data.response.includes('EXTENDED_SEARCH_REQUIRED')) {
+                                response = data.response;
+                            }
+                        }
+                    } catch (_) {}
+
+                    if (!response) {
+                        response = "I am your AGRI LINK smart agriculture assistant. Ask me about live temperature, soil moisture, laser distance, or precision farming advisories.";
+                    }
                 }
             }
 
@@ -824,7 +864,11 @@ class AgriVoiceAssistant {
             const errMsg = "Sensor telemetry evaluation completed. Ask another question about the farm or hardware.";
             this.appendMessage(errMsg, false);
             this.updateStateBadge('ERROR');
-            setTimeout(() => this.updateStateBadge('IDLE'), 2000);
+            this.sendHardwareCmd('CMD:STATE:ERROR');
+            setTimeout(() => {
+                this.updateStateBadge('IDLE');
+                this.sendHardwareCmd('CMD:STATE:IDLE');
+            }, 2000);
         }
     }
 }

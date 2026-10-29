@@ -1,17 +1,25 @@
+/**
+ * AGRI LINK / ORBIT-X - Localhost Development & Web Testing Server
+ * Serves the Mission Dashboard on http://localhost:8080/
+ * with automatic fallback to src/ and proxying to the Python AI service.
+ */
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
-const ROOT = process.argv[2] || '.';
+const PORT = process.env.PORT || 8080;
+const SRC_DIR = path.join(__dirname, 'src');
+const ROOT_DIR = __dirname;
 
 const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'text/javascript',
-    '.css': 'text/css',
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
     '.json': 'application/json',
     '.png': 'image/png',
-    '.jpg': 'image/jpg',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
     '.wav': 'audio/wav',
@@ -23,25 +31,97 @@ const MIME_TYPES = {
     '.wasm': 'application/wasm'
 };
 
-http.createServer((req, res) => {
-    let filePath = path.join(ROOT, req.url === '/' ? 'index.html' : req.url);
-    const extname = path.extname(filePath);
-    let contentType = MIME_TYPES[extname] || 'application/octet-stream';
+const server = http.createServer((req, res) => {
+    // Enable CORS for local testing
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    fs.readFile(filePath, (error, content) => {
-        if (error) {
-            if (error.code == 'ENOENT') {
-                res.writeHead(404);
-                res.end('Not Found');
-            } else {
-                res.writeHead(500);
-                res.end('Internal Server Error: ' + error.code);
-            }
-        } else {
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(content, 'utf-8');
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+    let pathname = decodeURIComponent(parsedUrl.pathname);
+
+    // API: Proxy Chat queries to Python AI daemon if running
+    if (pathname === '/chat' || pathname === '/api/chat') {
+        if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => {
+                const proxyReq = http.request({
+                    hostname: '127.0.0.1',
+                    port: 5005,
+                    path: '/chat',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }, (proxyRes) => {
+                    res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
+                    proxyRes.pipe(res);
+                });
+                proxyReq.on('error', () => {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        response: "AGRI LINK local server is online. AI service is currently running in background resilience mode.",
+                        status: "nominal"
+                    }));
+                });
+                proxyReq.write(body);
+                proxyReq.end();
+            });
+            return;
         }
+    }
+
+    // API: Accept Hardware Command from Web Console
+    if (pathname === '/api/command') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                console.log(`[WEB-CONSOLE] Command received: ${data.command}`);
+            } catch (_) {}
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
+
+    // Default route: load dashboard
+    if (pathname === '/' || pathname === '/index.html') {
+        pathname = '/index.html';
+    }
+
+    // Resolve file path: check in src/ first, then root
+    let targetPath = path.join(SRC_DIR, pathname);
+    if (!fs.existsSync(targetPath)) {
+        targetPath = path.join(ROOT_DIR, pathname);
+    }
+
+    fs.stat(targetPath, (err, stats) => {
+        if (err || !stats.isFile()) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end(`404 Not Found: ${pathname}`);
+            return;
+        }
+
+        const ext = path.extname(targetPath).toLowerCase();
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+        res.writeHead(200, { 'Content-Type': contentType });
+        const stream = fs.createReadStream(targetPath);
+        stream.pipe(res);
     });
-}).listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}/`);
+});
+
+server.listen(PORT, () => {
+    console.log('===================================================');
+    console.log(`[AGRI LINK] Local Web Console active!`);
+    console.log(`-> URL: http://localhost:${PORT}/`);
+    console.log(`-> Testing Mode: Browser Live Testing Enabled`);
+    console.log('===================================================');
 });

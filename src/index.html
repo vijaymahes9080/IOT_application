@@ -165,16 +165,16 @@
                 <div
                     style="display:flex; justify-content:space-between; align-items:baseline; position:relative; z-index: 2;">
                     <span class="ag-metric-label">THREAT SCORE</span>
-                    <span class="muted mono small">ETA: --:--</span>
+                    <span class="muted mono small" id="threat-eta">ETA: --:--</span>
                 </div>
                 <div
                     style="display:flex; justify-content:space-between; align-items:center; position:relative; z-index: 2;">
-                    <span class="ag-metric-value" style="font-size: 32px;">12 <span class="green"
+                    <span class="ag-metric-value" style="font-size: 32px;"><span id="threat-score-val">0</span> <span class="green" id="threat-trend"
                             style="font-size: 20px;">↓</span></span>
                     <div style="flex:1; height:40px; margin-left:20px;">
                         <canvas id="radar-waveform"></canvas>
                     </div>
-                    <span class="muted mono" style="font-size:9px; margin-left:10px;">FAIL PROB: 0.1%</span>
+                    <span class="muted mono" style="font-size:9px; margin-left:10px;">FAIL PROB: <span id="sys-fail-prob">0.0%</span></span>
                 </div>
             </div>
 
