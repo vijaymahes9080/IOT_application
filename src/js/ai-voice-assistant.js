@@ -914,13 +914,25 @@ class AgriVoiceAssistant {
                     // Direct browser mode HTTP fetch to Python AI Service
                     try {
                         let res = null;
-                        try { res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: query, telemetry: telemetry }) }); } catch (_) {}
-                        if (!res || !res.ok) try { res = await fetch('http://127.0.0.1:5005/chat', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ query: query, telemetry: telemetry })
-                        });
-                        if (res.ok) {
+                        try {
+                            res = await fetch('/chat', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ query: query, telemetry: telemetry })
+                            });
+                        } catch (_) {}
+
+                        if (!res || !res.ok) {
+                            try {
+                                res = await fetch('http://127.0.0.1:5005/chat', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: query, telemetry: telemetry })
+                                });
+                            } catch (_) {}
+                        }
+
+                        if (res && res.ok) {
                             const data = await res.json();
                             if (data.response && !data.response.includes('EXTENDED_SEARCH_REQUIRED')) {
                                 response = data.response;
