@@ -41,5 +41,15 @@
         "sync_interval_ms": 8000,
         "cloud_prediction_enabled": false,
         "cloud_prediction_endpoint": "/api/v1/predict"
+    },
+    "gemini": {
+        "api_key": "ENV:GEMINI_API_KEY",
+        "primary_model": "models/gemini-3.5-flash-lite",
+        "fallback_models": [
+            "models/gemini-3.1-flash-lite",
+            "models/gemini-3.8-flash"
+        ],
+        "enabled": true,
+        "timeout_seconds": 6
     }
 }

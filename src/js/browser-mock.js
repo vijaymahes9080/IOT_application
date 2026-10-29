@@ -162,10 +162,11 @@
         // AI Chat & Reasoning
         aiChat: async (query) => {
             try {
+                const snap = generateTelemetrySnapshot();
                 const res = await fetch('http://127.0.0.1:5005/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify({ query, telemetry: snap })
                 });
                 if (res.ok) {
                     const data = await res.json();

@@ -449,12 +449,13 @@ app.whenReady().then(() => {
   ipcMain.handle('ai-chat', async (event, query) => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+      const latestTelemetry = serialClient?.getLatestSnapshot?.() || null;
       const response = await fetch(`${AI_SERVICE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, telemetry: latestTelemetry }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
