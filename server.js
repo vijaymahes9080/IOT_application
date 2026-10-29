@@ -57,7 +57,10 @@ const server = http.createServer((req, res) => {
                     port: 5005,
                     path: '/chat',
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(body)
+                    }
                 }, (proxyRes) => {
                     res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
                     proxyRes.pipe(res);
@@ -74,6 +77,30 @@ const server = http.createServer((req, res) => {
             });
             return;
         }
+    }
+
+    // API: Return telemetry snapshot for browser clients
+    if (pathname === '/api/telemetry') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: "connected",
+            isFresh: true,
+            port: "COM4 (Server Emulation)",
+            timestamp: Date.now(),
+            data: {
+                esp32: {
+                    temp1: 27.6,
+                    humidity: 69.0,
+                    soilMoisture: 52.0,
+                    ldrSensor: 4080,
+                    ultrasonic: 76.7,
+                    laserDistance: 295,
+                    batt_v: "12.4",
+                    current_amps: 2.1
+                }
+            }
+        }));
+        return;
     }
 
     // API: Accept Hardware Command from Web Console
@@ -116,6 +143,14 @@ const server = http.createServer((req, res) => {
         const stream = fs.createReadStream(targetPath);
         stream.pipe(res);
     });
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`[SERVER ERROR] Port ${PORT} is already in use. Please terminate the conflicting process or choose another port.`);
+    } else {
+        console.error(`[SERVER ERROR]`, err);
+    }
 });
 
 server.listen(PORT, () => {

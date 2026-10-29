@@ -13,7 +13,7 @@ if %errorlevel% equ 0 set "PY_CMD=python"
 if "%PY_CMD%"=="" set "PY_CMD=py -3"
 
 :: Start AI Service in background if not already listening on port 5005
-netstat -ano | findstr :5005 >nul
+netstat -ano | findstr /R ":5005\>" >nul
 if %errorlevel% neq 0 (
     echo [AI SERVICE] Launching Python AI daemon on port 5005...
     start "AGRI LINK AI Daemon" /min %PY_CMD% ai_service\app.py
