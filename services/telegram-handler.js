@@ -1,5 +1,6 @@
 // services/telegram-handler.js
-// Intent handling + optimized application telemetry retrieval for the Telegram bot.
+// AGRI LINK AI — Hybrid Telemetry Intelligence Engine
+// Integrates historical/latest database records and independent live hardware monitoring.
 
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +14,7 @@ function classifyIntent(text) {
   if (/soil/.test(t)) return 'soil';
   if (/temp/.test(t)) return 'temp';
   if (/humid/.test(t)) return 'humidity';
-  if (/online|device/.test(t)) return 'device';
+  if (/online|device|hardware/.test(t)) return 'device';
   if (/^\/alerts(\s.*)?$/i.test(t) || /alert/.test(t)) return 'alerts';
   if (/^\/history(\s.*)?$/i.test(t) || /histor|previous|past/.test(t)) return 'history';
   if (/^\/summary(\s.*)?$/i.test(t) || /summar/.test(t)) return 'summary';
@@ -21,15 +22,12 @@ function classifyIntent(text) {
   return 'unknown';
 }
 
-let dbMgr = null, serialClient = null, tbConnector = null;
+let dbMgr = null, hardwareMonitor = null;
 try { dbMgr = require('./database-mgr'); } catch (e) { console.warn('[Telegram] dbMgr unavailable:', e.message); }
-try { serialClient = require('./serial-client'); } catch (e) { console.warn('[Telegram] serialClient unavailable:', e.message); }
-try { tbConnector = require('./thingsboard-connector'); } catch (e) { console.warn('[Telegram] tbConnector unavailable:', e.message); }
+try { hardwareMonitor = require('./hardware-monitor'); } catch (e) { console.warn('[Telegram] hardwareMonitor unavailable:', e.message); }
 
-/**
- * Format age in human-readable and standard duration form.
- */
 function formatAge(ageSec) {
+  if (ageSec === null || ageSec === undefined || isNaN(ageSec)) return 'N/A';
   if (ageSec < 60) return `${ageSec}s ago`;
   const mins = Math.floor(ageSec / 60);
   const secs = ageSec % 60;
@@ -37,19 +35,19 @@ function formatAge(ageSec) {
 }
 
 /**
- * Determine freshness classification according to specification:
+ * Determine database data freshness classification:
  * - Under 30 seconds: FRESH
  * - 30 seconds – 2 minutes: RECENT
  * - 2 – 5 minutes: DELAYED
- * - Above 5 minutes: STALE
+ * - Over 5 minutes: STALE
  */
 function calculateFreshness(timestampStr) {
   if (!timestampStr) {
-    return { status: 'UNKNOWN', ageSec: null, ageLabel: 'N/A' };
+    return { status: 'STALE', ageSec: null, ageLabel: 'N/A' };
   }
   const recTime = new Date(timestampStr).getTime();
   if (isNaN(recTime)) {
-    return { status: 'UNKNOWN', ageSec: null, ageLabel: 'Invalid date' };
+    return { status: 'STALE', ageSec: null, ageLabel: 'Invalid date' };
   }
   const now = Date.now();
   const diffMs = Math.max(0, now - recTime);
@@ -73,51 +71,40 @@ function calculateFreshness(timestampStr) {
   };
 }
 
-async function getAppStatus(isAuthorized = false, chatId = '') {
-  try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8'));
-    let dbCount = null;
-    if (dbMgr && typeof dbMgr.getDbRecordCount === 'function') {
-      try { dbCount = await dbMgr.getDbRecordCount(); } catch (e) {}
-    }
-    return {
-      name: cfg.app_name || 'ORBIT-X / AGRI LINK AI',
-      missionId: cfg.mission ? cfg.mission.id : 'TITAN-1',
-      version: cfg.version || '1.0.0',
-      authorized: isAuthorized,
-      chatId: chatId,
-      dbRecords: dbCount,
-      lastUpdated: new Date().toISOString()
-    };
-  } catch (e) {
-    return { name: 'ORBIT-X', error: e.message };
+/**
+ * Formats values safely with units and handles missing/nulls gracefully.
+ */
+function formatVal(v, unit = '', decimals = 1) {
+  if (v === null || v === undefined) return 'N/A';
+  if (typeof v === 'number') {
+    return isFinite(v) ? `${v.toFixed(decimals)}${unit}` : 'N/A';
   }
+  const num = parseFloat(v);
+  return isNaN(num) ? `${v}${unit}` : `${num.toFixed(decimals)}${unit}`;
 }
 
 /**
- * Retrieve the newest valid telemetry record with zero combination from multiple timestamps.
- * 1. Checks physical serial hardware (live feed if connected)
- * 2. Queries newest record from telemetry_logs table in mission_logs.mdb
+ * Retrieve Hybrid Telemetry Data:
+ * Evaluates both Database and Live Hardware independently and unifies them.
  */
-async function getLatestData() {
-  // 1. Try physical serial hardware snapshot if connected
-  try {
-    if (serialClient && typeof serialClient.getLatestSnapshot === 'function') {
-      const snap = serialClient.getLatestSnapshot();
-      if (snap && snap.data && serialClient.hardwareStatus === 'connected') {
-        const ts = snap.timestamp ? new Date(snap.timestamp).toISOString() : new Date().toISOString();
-        const freshness = calculateFreshness(ts);
-        return {
-          data: snap.data,
-          source: `ESP32 Physical Hardware (${serialClient.lastConnectedPort || 'Serial'})`,
-          timestamp: ts,
-          freshness
-        };
-      }
-    }
-  } catch (e) {}
+async function getHybridTelemetry() {
+  const hwState = hardwareMonitor ? hardwareMonitor.getHardwareState() : {
+    state: 'UNKNOWN',
+    connected: false,
+    port: null,
+    method: 'Not configured',
+    lastUpdate: null,
+    lastUpdateAgeSec: null,
+    error: 'Hardware monitor not loaded'
+  };
 
-  // 2. Query newest record from mission_logs.mdb with explicit timeout (2.5s)
+  // 1. Check if live physical hardware snapshot is fresh
+  const liveSnap = hardwareMonitor ? hardwareMonitor.getLiveSnapshot() : null;
+
+  // 2. Query newest record from mission_logs.mdb with 2.5s timeout
+  let dbRecord = null;
+  let dbError = null;
+
   try {
     if (dbMgr) {
       const queryPromise = (typeof dbMgr.getLatestTelemetryRecord === 'function')
@@ -125,71 +112,114 @@ async function getLatestData() {
         : dbMgr.getRecentTelemetry(1).then(r => (Array.isArray(r) && r.length) ? r[0] : null);
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database query timed out')), 2500)
+        setTimeout(() => reject(new Error('Database query timed out (> 2500ms)')), 2500)
       );
 
-      const record = await Promise.race([queryPromise, timeoutPromise]);
-      if (record) {
-        const ts = record.timestamp_log || new Date().toISOString();
-        const freshness = calculateFreshness(ts);
-        return {
-          data: record,
-          source: 'Local Database (mission_logs.mdb - telemetry_logs)',
-          timestamp: ts,
-          freshness
-        };
-      }
+      dbRecord = await Promise.race([queryPromise, timeoutPromise]);
+    } else {
+      dbError = 'Database manager module unavailable';
     }
-  } catch (e) {
-    console.warn('[Telegram] DB query error / timeout:', e.message);
+  } catch (err) {
+    dbError = err.message;
+    console.warn('[Telegram] DB query warning:', err.message);
   }
 
+  // 3. Hybrid Source Resolution
+  let activeData = null;
+  let dataSource = '';
+  let dataTimestamp = null;
+  let isHardwareDirect = false;
+
+  if (liveSnap && liveSnap.data && hwState.state === 'ONLINE') {
+    // Live physical hardware stream is available and newer
+    activeData = liveSnap.data;
+    dataSource = `Live ESP32 Stream (${hwState.port || 'Serial'})`;
+    dataTimestamp = liveSnap.data.timestamp ? new Date(liveSnap.data.timestamp).toISOString() : new Date().toISOString();
+    isHardwareDirect = true;
+  } else if (dbRecord) {
+    // Database record is selected
+    activeData = dbRecord;
+    dataSource = 'mission_logs.mdb (telemetry_logs)';
+    dataTimestamp = dbRecord.timestamp_log || new Date().toISOString();
+    isHardwareDirect = false;
+  }
+
+  const dataFreshness = dataTimestamp ? calculateFreshness(dataTimestamp) : { status: 'STALE', ageSec: null, ageLabel: 'N/A' };
+
   return {
-    data: null,
-    note: 'No valid telemetry record currently available (Hardware and Database offline).',
-    source: 'Application Backend',
-    timestamp: new Date().toISOString(),
-    freshness: { status: 'STALE', ageSec: null, ageLabel: 'N/A' }
+    activeData,
+    dataSource,
+    dataTimestamp,
+    isHardwareDirect,
+    dataFreshness,
+    hardware: hwState,
+    database: {
+      connected: !dbError && dbRecord !== null,
+      error: dbError,
+      latestTimestamp: dbRecord ? dbRecord.timestamp_log : null,
+      recordCount: null
+    }
   };
 }
 
 /**
- * Formats sensor readings into the master specification layout:
- * AGRI LINK AI — Agricultural Telemetry
+ * Standard Professional Message Layout according to Section 8 Specification:
+ * 
+ * 🌱 AGRI LINK AI — AGRICULTURAL TELEMETRY
+ * 
+ * 📊 SENSOR READINGS
+ * • Soil Moisture: ...
  * ...
- * Data Status: FRESH / RECENT / DELAYED / STALE
- * Source: ...
- * Last Updated: ...
- * Data Age: ...
+ * 🌾 AGRICULTURAL CONTEXT
+ * • Crop: ...
+ * • Satellite Orbit Distance: ...
+ * 
+ * 🔌 HARDWARE CONNECTIVITY
+ * • ESP32: ...
+ * • Last Hardware Update: ...
+ * • Communication: ...
+ * 
+ * 💾 DATABASE STATUS
+ * • Database: mission_logs.mdb
+ * • Latest Record: ...
+ * • Data Age: ...
+ * • Data Freshness: FRESH / RECENT / DELAYED / STALE
+ * 
+ * ⚠️ WARNING
+ * ...
  */
-async function formatTelemetryResponse() {
-  const latest = await getLatestData();
-  if (!latest.data) {
-    return [
-      "AGRI LINK AI — Agricultural Telemetry",
+async function formatStandardTelemetryResponse() {
+  const hybrid = await getHybridTelemetry();
+  const d = hybrid.activeData;
+  const hw = hybrid.hardware;
+  const db = hybrid.database;
+
+  // Handle case where NO data exists in DB and Hardware is offline
+  if (!d) {
+    const lines = [
+      "🌱 AGRI LINK AI — AGRICULTURAL TELEMETRY",
       "",
-      "⚠️ Sensor readings unavailable (no active sensor feed or database record).",
+      "⚠️ SENSOR READINGS UNAVAILABLE",
+      db.error ? `• Database Error: ${db.error}` : "• No telemetry records found in mission_logs.mdb.",
       "",
-      `Data Status: ${latest.freshness.status}`,
-      `Source: ${latest.source}`,
-      `Last Updated: ${latest.timestamp}`,
-      `Data Age: ${latest.freshness.ageLabel}`
-    ].join('\n');
+      "🔌 HARDWARE CONNECTIVITY",
+      `• ESP32: ${hw.state}`,
+      `• Last Hardware Update: ${hw.lastUpdate || 'Never'}`,
+      `• Communication: ${hw.method}`,
+      "",
+      "💾 DATABASE STATUS",
+      "• Database: mission_logs.mdb",
+      "• Status: " + (db.error ? "Unavailable" : "No Records"),
+      "",
+      "⚠️ WARNING",
+      "Both physical ESP32 sensor hardware and historical database records are currently unavailable. Application is in standby mode."
+    ];
+    return lines.join('\n');
   }
 
-  const d = latest.data;
+  // Normalize single snapshot fields
   const esp = d.esp32 || d;
   const sat = d.satellite || d;
-
-  // Helper for numeric extraction and graceful missing/null handling
-  const val = (v, unit = '', decimals = 1) => {
-    if (v === null || v === undefined) return 'N/A';
-    if (typeof v === 'number') {
-      return isFinite(v) ? `${v.toFixed(decimals)}${unit}` : 'N/A';
-    }
-    const num = parseFloat(v);
-    return isNaN(num) ? `${v}${unit}` : `${num.toFixed(decimals)}${unit}`;
-  };
 
   const soilMoisture = esp.soil_moisture !== undefined ? esp.soil_moisture : esp.soilMoisture;
   const soilTemp = esp.soil_temp !== undefined ? esp.soil_temp : esp.soilTemp;
@@ -203,41 +233,98 @@ async function formatTelemetryResponse() {
   const orbitDist = sat.satellite_distance_km !== undefined ? sat.satellite_distance_km : sat.distance;
 
   const lines = [
-    "AGRI LINK AI — Agricultural Telemetry",
+    "🌱 AGRI LINK AI — AGRICULTURAL TELEMETRY",
     "",
-    `Soil Moisture: ${val(soilMoisture, '%', 1)}`,
-    `Soil Temperature: ${val(soilTemp, '°C', 1)}`,
-    `Ambient Temperature: ${val(temp1, '°C', 1)}`,
-    `Secondary Temperature: ${val(temp2, '°C', 1)}`,
-    `Solar Irradiance: ${val(ldr, ' lux', 0)}`,
-    `Battery Voltage: ${val(batt, 'V', 2)}`,
-    `Power Draw: ${val(current, ' A', 2)}`
+    "📊 SENSOR READINGS",
+    "",
+    `• Soil Moisture: ${formatVal(soilMoisture, '%', 1)}`,
+    `• Soil Temperature: ${formatVal(soilTemp, '°C', 1)}`,
+    `• Ambient Temperature (T1): ${formatVal(temp1, '°C', 1)}`,
+    `• Secondary Temperature (T2): ${formatVal(temp2, '°C', 1)}`,
+    `• Solar Irradiance (LDR): ${formatVal(ldr, ' lux', 0)}`,
+    `• Battery Voltage: ${formatVal(batt, 'V', 2)}`,
+    `• Power Draw: ${formatVal(current, ' A', 2)}`
   ];
 
   if (solarp !== undefined && solarp !== null) {
-    lines.push(`Solar Power: ${val(solarp, ' W', 1)}`);
-  }
-  if (crop) {
-    lines.push(`Crop: ${crop}`);
-  }
-  if (orbitDist !== undefined && orbitDist !== null) {
-    lines.push(`Satellite Orbit Distance: ${val(orbitDist, ' km', 1)}`);
+    lines.push(`• Solar Power: ${formatVal(solarp, ' W', 1)}`);
   }
 
   lines.push("");
-  lines.push(`Data Status: ${latest.freshness.status}`);
-  lines.push(`Source: ${latest.source}`);
-  lines.push(`Last Updated: ${latest.timestamp}`);
-  lines.push(`Data Age: ${latest.freshness.ageLabel}`);
+  lines.push("🌾 AGRICULTURAL CONTEXT");
+  lines.push("");
+  lines.push(`• Crop: ${crop}`);
+  if (orbitDist !== undefined && orbitDist !== null) {
+    lines.push(`• Satellite Orbit Distance: ${formatVal(orbitDist, ' km', 1)}`);
+  }
+
+  lines.push("");
+  lines.push("🔌 HARDWARE CONNECTIVITY");
+  lines.push("");
+  lines.push(`• ESP32: ${hw.state}`);
+  lines.push(`• Last Hardware Update: ${hw.lastUpdate || 'None detected'}`);
+  lines.push(`• Communication: ${hw.method}`);
+
+  lines.push("");
+  lines.push("💾 DATABASE STATUS");
+  lines.push("");
+  lines.push("• Database: mission_logs.mdb");
+  lines.push(`• Latest Record: ${hybrid.dataTimestamp || 'N/A'}`);
+  lines.push(`• Data Age: ${hybrid.dataFreshness.ageLabel}`);
+  lines.push(`• Data Freshness: ${hybrid.dataFreshness.status}`);
+
+  // Warning logic per Section 8:
+  // "ESP32 hardware is currently disconnected. The readings above are the latest available database records, not fresh hardware measurements."
+  const showDisconnectedWarning = (hw.state === 'DISCONNECTED' || hw.state === 'RECONNECTING');
+  const showStaleWarning = (hybrid.dataFreshness.status === 'STALE');
+
+  if (showDisconnectedWarning || showStaleWarning) {
+    lines.push("");
+    lines.push("⚠️ WARNING");
+    if (showDisconnectedWarning && !showStaleWarning) {
+      lines.push("ESP32 hardware is currently disconnected. The readings above are the latest available database records, not fresh hardware measurements.");
+    } else if (showDisconnectedWarning && showStaleWarning) {
+      lines.push("ESP32 hardware is currently disconnected and the newest database records are STALE (> 5 minutes old). Readings reflect historical conditions.");
+    } else if (showStaleWarning) {
+      lines.push("Database telemetry is STALE (> 5 minutes old). Sensor ingestion may be paused.");
+    }
+  }
 
   return lines.join('\n');
+}
+
+async function getAppStatus(isAuthorized = false, chatId = '') {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8'));
+    let dbCount = null;
+    if (dbMgr && typeof dbMgr.getDbRecordCount === 'function') {
+      try { dbCount = await dbMgr.getDbRecordCount(); } catch (e) {}
+    }
+    const hw = hardwareMonitor ? hardwareMonitor.getHardwareState() : { state: 'UNKNOWN' };
+    const hybrid = await getHybridTelemetry();
+
+    return [
+      "📊 AGRI LINK AI — System & Account Status",
+      `• Application: ${cfg.app_name || 'ORBIT-X'} (v${cfg.version || '1.0.0'})`,
+      `• Mission ID: ${cfg.mission ? cfg.mission.id : 'TITAN-1'}`,
+      `• Your Chat ID: ${chatId}`,
+      `• Authorization: ${isAuthorized ? '✅ Authorized (Active)' : '⛔ Pending Authorization'}`,
+      `• Database Records: ${dbCount !== null ? dbCount : 'Connected'}`,
+      `• Hardware State: ${hw.state}`,
+      `• Telemetry Source: ${hybrid.dataSource}`,
+      `• Telemetry Freshness: ${hybrid.dataFreshness.status} (${hybrid.dataFreshness.ageLabel})`,
+      `• System Clock: ${new Date().toISOString()}`
+    ].join('\n');
+  } catch (e) {
+    return `📊 AGRI LINK AI — Status Error: ${e.message}`;
+  }
 }
 
 async function getAlerts() {
   try {
     if (dbMgr && typeof dbMgr.getAnomalyHistory === 'function') {
       const rows = await dbMgr.getAnomalyHistory(10);
-      return { alerts: rows || [], source: 'Local Database (mission_logs.mdb)', timestamp: new Date().toISOString() };
+      return { alerts: rows || [], source: 'mission_logs.mdb (anomaly_events)', timestamp: new Date().toISOString() };
     }
   } catch (e) {}
   return { alerts: [], source: 'Application Backend', timestamp: new Date().toISOString() };
@@ -247,7 +334,7 @@ async function getHistory() {
   try {
     if (dbMgr && typeof dbMgr.getRecentTelemetry === 'function') {
       const rows = await dbMgr.getRecentTelemetry(10);
-      return { records: rows || [], source: 'Local Database (mission_logs.mdb)', timestamp: new Date().toISOString() };
+      return { records: rows || [], source: 'mission_logs.mdb (telemetry_logs)', timestamp: new Date().toISOString() };
     }
   } catch (e) {}
   return { records: [], source: 'Application Backend', timestamp: new Date().toISOString() };
@@ -257,13 +344,9 @@ const PENDING_FILE = path.join(__dirname, '..', 'telegram_pending.json');
 
 function loadPending() {
   try {
-    if (fs.existsSync(PENDING_FILE)) {
-      return JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8'));
-    }
+    if (fs.existsSync(PENDING_FILE)) return JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8'));
     return [];
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
 
 function savePending(list) {
@@ -292,7 +375,7 @@ async function handle({ text, chatId, fromId, isAuthorized }) {
   const intent = classifyIntent(text);
   const numericChatId = String(chatId);
 
-  // When an authorized user interacts, update pending registry so they are not kept as pending
+  // Security: Remove authorized user from pending queue automatically
   if (isAuthorized) {
     removePending(numericChatId);
   }
@@ -311,12 +394,11 @@ async function handle({ text, chatId, fromId, isAuthorized }) {
       ].join('\n');
     }
 
-    // Pending registration path for unapproved accounts
     const pending = loadPending();
     if (!pending.includes(numericChatId)) {
       pending.push(numericChatId);
       savePending(pending);
-      console.log(`[Telegram] [REGISTRATION_SAVED] Added Chat ID ${numericChatId} (From ID: ${fromId || numericChatId}) to telegram_pending.json`);
+      console.log(`[Telegram] [REGISTRATION_SAVED] Added Chat ID ${numericChatId} to telegram_pending.json`);
     }
 
     return [
@@ -337,12 +419,12 @@ async function handle({ text, chatId, fromId, isAuthorized }) {
     return [
       "🛰️ AGRI LINK AI — Available Telegram Commands:",
       "",
-      "• /status  - Show application, database, and telemetry freshness status",
-      "• /sensors - Show live agricultural telemetry (Moisture, Temp, Irradiance, Battery)",
-      "• /latest  - Show raw latest telemetry payload snapshot",
-      "• /alerts  - Show recent system and crop stress anomalies",
-      "• /history - Show recent telemetry record timestamps and counts",
-      "• /summary - Show overall system health and sensor digest",
+      "• /sensors - Show latest hybrid telemetry (Sensors, Hardware & Database status)",
+      "• /status  - Show system status, database health, and hardware connection",
+      "• /history - Retrieve recent telemetry batch records from mission_logs.mdb",
+      "• /alerts  - Show recent system and crop stress anomaly events",
+      "• /latest  - Show raw JSON snapshot of latest telemetry record",
+      "• /summary - Show comprehensive mission summary and sensor digest",
       "",
       "Natural language queries are also supported (e.g. 'soil moisture', 'temperature', 'device status')."
     ].join('\n');
@@ -350,48 +432,43 @@ async function handle({ text, chatId, fromId, isAuthorized }) {
 
   // --- 3. /status command ---
   if (intent === 'status') {
-    const s = await getAppStatus(isAuthorized, numericChatId);
-    const latest = await getLatestData();
-    return [
-      "📊 AGRI LINK AI — System & Account Status",
-      `• Application: ${s.name} (v${s.version})`,
-      `• Mission ID: ${s.missionId}`,
-      `• Your Chat ID: ${numericChatId}`,
-      `• Authorization: ${isAuthorized ? '✅ Authorized (Active)' : '⛔ Pending Authorization'}`,
-      `• Database Records: ${s.dbRecords !== null ? s.dbRecords : 'Connected'}`,
-      `• Telemetry Source: ${latest.source}`,
-      `• Telemetry Freshness: ${latest.freshness.status} (${latest.freshness.ageLabel})`,
-      `• System Clock: ${s.lastUpdated}`
-    ].join('\n');
+    return await getAppStatus(isAuthorized, numericChatId);
   }
 
-  // --- 4. /sensors command & specific sensor queries ---
+  // --- 4. /sensors command & sensor queries ---
   if (intent === 'sensors' || intent === 'soil' || intent === 'temp' || intent === 'humidity') {
-    return await formatTelemetryResponse();
+    return await formatStandardTelemetryResponse();
   }
 
   // --- 5. /device command ---
   if (intent === 'device') {
-    const d = await getLatestData();
-    return d.data 
-      ? `📡 Device & Hardware Status\n• State: Online (active data stream)\n• Source: ${d.source}\n• Data Status: ${d.freshness.status} (${d.freshness.ageLabel})\n• Timestamp: ${d.timestamp}`
-      : `📡 Device & Hardware Status\n• State: Offline / Standby (no live stream)\n• Source: ${d.source}\n• Timestamp: ${d.timestamp}`;
+    const hw = hardwareMonitor ? hardwareMonitor.getHardwareState() : { state: 'UNKNOWN' };
+    const hybrid = await getHybridTelemetry();
+    return [
+      "📡 AGRI LINK AI — Hardware & Device Status",
+      `• Hardware State: ${hw.state}`,
+      `• Connection Method: ${hw.method}`,
+      `• Last Hardware Update: ${hw.lastUpdate || 'None'}`,
+      `• Data Source: ${hybrid.dataSource}`,
+      `• Data Freshness: ${hybrid.dataFreshness.status} (${hybrid.dataFreshness.ageLabel})`,
+      hw.error ? `• Notice: ${hw.error}` : "• Channel: Nominal"
+    ].join('\n');
   }
 
   // --- 6. /latest command ---
   if (intent === 'latest') {
-    const d = await getLatestData();
-    if (!d.data) {
-      return `📡 Latest Telemetry Snapshot\n${d.note}\nSource: ${d.source}\nTimestamp: ${d.timestamp}`;
+    const hybrid = await getHybridTelemetry();
+    if (!hybrid.activeData) {
+      return `📡 Latest Telemetry Snapshot\nNo valid telemetry records available.\nSource: ${hybrid.dataSource}\nTimestamp: ${hybrid.dataTimestamp || 'N/A'}`;
     }
     return [
       "📡 Latest Telemetry Snapshot",
-      `Data Status: ${d.freshness.status} (${d.freshness.ageLabel})`,
+      `Source: ${hybrid.dataSource}`,
+      `Hardware: ${hybrid.hardware.state} | Freshness: ${hybrid.dataFreshness.status} (${hybrid.dataFreshness.ageLabel})`,
       "```json",
-      JSON.stringify(d.data, null, 2).slice(0, 1500),
+      JSON.stringify(hybrid.activeData, null, 2).slice(0, 1500),
       "```",
-      `Source: ${d.source}`,
-      `Timestamp: ${d.timestamp}`
+      `Timestamp: ${hybrid.dataTimestamp}`
     ].join('\n');
   }
 
@@ -431,14 +508,13 @@ async function handle({ text, chatId, fromId, isAuthorized }) {
   if (intent === 'summary') {
     const s = await getAppStatus(isAuthorized, numericChatId);
     const a = await getAlerts();
-    const sensorText = await formatTelemetryResponse();
+    const sensorText = await formatStandardTelemetryResponse();
     return [
       `📋 AGRI LINK AI — Operational Summary`,
-      `• Application: ${s.name} v${s.version}`,
+      s,
       `• Logged Alerts: ${a.alerts.length}`,
-      `• Database Telemetry Digest:`,
-      sensorText,
-      `• Updated: ${s.lastUpdated}`
+      "",
+      sensorText
     ].join('\n');
   }
 
@@ -451,7 +527,7 @@ module.exports = {
   loadPending,
   savePending,
   removePending,
-  getLatestData,
-  calculateFreshness,
-  formatTelemetryResponse
+  getHybridTelemetry,
+  formatStandardTelemetryResponse,
+  calculateFreshness
 };
