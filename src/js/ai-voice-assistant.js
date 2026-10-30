@@ -246,121 +246,297 @@ class AgriVoiceAssistant {
     }
 
     initSpeechRecognition() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.fallbackActive = false;
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn("[VOICE] Web Speech API not supported in current environment; typing interface enabled.");
-            if (this.chatMic) {
-                this.chatMic.title = "Voice recognition requires Chrome or Edge browser. Click for info.";
-                this.chatMic.addEventListener('click', () => {
-                    this.appendMessage("ℹ️ <strong>Voice Recognition</strong>: Speech recognition is supported in Google Chrome and Microsoft Edge on <code>http://localhost:8080/</code>. In this window, you can type your query in the input box below and press Enter!", false, true);
-                });
+
+        if (SpeechRecognition) {
+            try {
+                this.recognition = new SpeechRecognition();
+                this.recognition.continuous = false;
+                this.recognition.interimResults = true;
+                this.recognition.lang = 'en-US';
+
+                this.recognition.onstart = () => {
+                    this.isRecording = true;
+                    this.updateStateBadge('LISTENING');
+                    this.sendHardwareCmd('CMD:STATE:LISTEN');
+                    if (this.chatMic) {
+                        this.chatMic.style.background = 'rgba(255, 23, 68, 0.4)';
+                        this.chatMic.style.color = '#ff1744';
+                        this.chatMic.style.borderColor = '#ff1744';
+                        this.chatMic.style.boxShadow = '0 0 15px rgba(255, 23, 68, 0.8)';
+                    }
+                    if (this.chatInput) {
+                        this.chatInput.placeholder = "🎙️ Listening... Speak your query clearly now...";
+                    }
+                };
+
+                this.recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+
+                    if (this.chatInput) {
+                        this.chatInput.value = finalTranscript || interimTranscript;
+                    }
+
+                    if (finalTranscript.trim().length > 0) {
+                        this.stopRecording();
+                        this.handleSend();
+                    }
+                };
+
+                this.recognition.onerror = async (event) => {
+                    console.warn("[VOICE] Browser SpeechRecognition status:", event.error);
+                    this.stopRecording();
+                    this.updateStateBadge('IDLE');
+
+                    if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+                        this.appendMessage("⚠️ <strong>Microphone Permission Blocked</strong>: Please allow microphone access in your system/browser settings, then click the mic button again.", false, true);
+                    } else if (event.error === 'network') {
+                        // Resilient Fallback: If Web Speech network service is unreachable, seamlessly trigger Neural STT Audio Capture
+                        console.log("[VOICE] Network STT service unreachable, engaging Neural Core STT fallback...");
+                        this.startNeuralAudioCapture();
+                    } else if (event.error === 'no-speech') {
+                        if (this.chatInput) {
+                            this.chatInput.placeholder = "No speech detected. Click the mic button to try again...";
+                        }
+                    }
+                };
+
+                this.recognition.onend = () => {
+                    this.stopRecording();
+                    if (this.state === 'LISTENING') {
+                        this.updateStateBadge('IDLE');
+                    }
+                };
+            } catch (e) {
+                console.warn("[VOICE] Native Web Speech API initialization issue:", e);
+                this.recognition = null;
             }
+        }
+
+        if (this.chatMic) {
+            this.chatMic.addEventListener('click', async () => {
+                if (this.isRecording) {
+                    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                        this.mediaRecorder.stop();
+                    } else if (this.recognition) {
+                        this.recognition.stop();
+                    }
+                    return;
+                }
+
+                this.stopSpeaking();
+
+                // If native SpeechRecognition is available, try it first
+                if (this.recognition) {
+                    try {
+                        this.recognition.start();
+                        return;
+                    } catch (e) {
+                        console.warn("[VOICE] Native recognition start exception, using Neural STT fallback:", e);
+                    }
+                }
+
+                // Fallback to Neural Audio Capture via AudioContext / MediaRecorder
+                this.startNeuralAudioCapture();
+            });
+        }
+    }
+
+    async startNeuralAudioCapture() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.appendMessage("⚠️ Audio capture not supported in this environment.", false, true);
             return;
         }
 
         try {
-            this.recognition = new SpeechRecognition();
-            this.recognition.continuous = false;
-            this.recognition.interimResults = true;
-            this.recognition.lang = 'en-US';
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const sourceNode = audioCtx.createMediaStreamSource(stream);
+            
+            // Set up ScriptProcessor for direct raw PCM recording for maximum compatibility
+            const bufferSize = 4096;
+            const recorderNode = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+            const recordedSamples = [];
 
-            this.recognition.onstart = () => {
-                this.isRecording = true;
-                this.updateStateBadge('LISTENING');
-                this.sendHardwareCmd('CMD:STATE:LISTEN');
-                if (this.chatMic) {
-                    this.chatMic.style.background = 'rgba(255, 23, 68, 0.4)';
-                    this.chatMic.style.color = '#ff1744';
-                    this.chatMic.style.borderColor = '#ff1744';
-                    this.chatMic.style.boxShadow = '0 0 15px rgba(255, 23, 68, 0.8)';
-                }
-                if (this.chatInput) {
-                    this.chatInput.placeholder = "🎙️ Listening... Speak your query clearly now...";
-                }
-            };
-
-            this.recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
-                }
-
-                if (this.chatInput) {
-                    this.chatInput.value = finalTranscript || interimTranscript;
-                }
-
-                if (finalTranscript.trim().length > 0) {
-                    this.stopRecording();
-                    this.handleSend();
-                }
-            };
-
-            this.recognition.onerror = (event) => {
-                console.warn("[VOICE] Recognition status:", event.error);
-                this.stopRecording();
-                this.updateStateBadge('IDLE');
-
-                if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-                    this.appendMessage("⚠️ <strong>Microphone Permission Blocked</strong>: Please click the camera/microphone icon in your browser address bar and choose <em>'Always allow'</em>, then click the mic button again.", false, true);
-                } else if (event.error === 'network') {
-                    this.appendMessage("⚠️ <strong>Voice Recognition Notice</strong>: Google Speech-to-Text network service could not be reached. You can type your query in the text box below and press Enter!", false, true);
-                } else if (event.error === 'no-speech') {
-                    if (this.chatInput) {
-                        this.chatInput.placeholder = "No speech detected. Click the mic button to try again...";
-                    }
-                }
-            };
-
-            this.recognition.onend = () => {
-                this.stopRecording();
-                if (this.state === 'LISTENING') {
-                    this.updateStateBadge('IDLE');
-                }
-            };
+            this.isRecording = true;
+            this.updateStateBadge('LISTENING');
+            this.sendHardwareCmd('CMD:STATE:LISTEN');
 
             if (this.chatMic) {
-                this.chatMic.addEventListener('click', async () => {
-                    if (this.isRecording) {
-                        this.recognition.stop();
-                        return;
-                    }
-
-                    this.stopSpeaking();
-
-                    // Proactively request browser microphone permission prompt if needed
-                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                        try {
-                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                            stream.getTracks().forEach(t => t.stop());
-                        } catch (err) {
-                            console.warn("[VOICE] getUserMedia check:", err);
-                            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                                this.appendMessage("⚠️ <strong>Microphone Access Blocked</strong>: Please allow microphone permission in your browser address bar, then click the mic again.", false, true);
-                                return;
-                            }
-                        }
-                    }
-
-                    try {
-                        this.recognition.start();
-                    } catch (e) {
-                        console.warn("[VOICE] Start call exception:", e);
-                        try {
-                            this.recognition.abort();
-                            setTimeout(() => this.recognition.start(), 200);
-                        } catch (_) {}
-                    }
-                });
+                this.chatMic.style.background = 'rgba(255, 23, 68, 0.4)';
+                this.chatMic.style.color = '#ff1744';
+                this.chatMic.style.borderColor = '#ff1744';
+                this.chatMic.style.boxShadow = '0 0 15px rgba(255, 23, 68, 0.8)';
             }
-        } catch (e) {
-            console.warn("[VOICE] Speech recognition initialization skipped:", e);
+            if (this.chatInput) {
+                this.chatInput.placeholder = "🎙️ Neural Listening... Speak your query (3s auto-capture)...";
+            }
+
+            recorderNode.onaudioprocess = (e) => {
+                if (!this.isRecording) return;
+                const channelData = e.inputBuffer.getChannelData(0);
+                recordedSamples.push(new Float32Array(channelData));
+            };
+
+            sourceNode.connect(recorderNode);
+            recorderNode.connect(audioCtx.destination);
+
+            // Record for 3.5 seconds or until user clicks mic again
+            let stopped = false;
+            const stopNeuralRecording = async () => {
+                if (stopped) return;
+                stopped = true;
+                this.stopRecording();
+                this.updateStateBadge('PROCESSING');
+
+                recorderNode.disconnect();
+                sourceNode.disconnect();
+                stream.getTracks().forEach(t => t.stop());
+                audioCtx.close();
+
+                // Encode recordedSamples to 16-bit PCM WAV
+                let totalLength = 0;
+                for (let i = 0; i < recordedSamples.length; i++) {
+                    totalLength += recordedSamples[i].length;
+                }
+                if (totalLength === 0) {
+                    this.updateStateBadge('IDLE');
+                    return;
+                }
+
+                const merged = new Float32Array(totalLength);
+                let offset = 0;
+                for (let i = 0; i < recordedSamples.length; i++) {
+                    merged.set(recordedSamples[i], offset);
+                    offset += recordedSamples[i].length;
+                }
+
+                // Downsample to 16000Hz for high-accuracy STT
+                const wavBuffer = this.encodeWAV(merged, audioCtx.sampleRate, 16000);
+
+                if (this.chatInput) {
+                    this.chatInput.placeholder = "⚡ Transcribing audio via Neural STT Core...";
+                }
+
+                try {
+                    let result = null;
+                    if (window.electronAPI && window.electronAPI.aiTranscribe) {
+                        result = await window.electronAPI.aiTranscribe(new Uint8Array(wavBuffer));
+                    } else {
+                        const res = await fetch('/api/transcribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'audio/wav' },
+                            body: wavBuffer
+                        });
+                        result = await res.json();
+                    }
+
+                    if (result && result.success && result.text && result.text.trim().length > 0) {
+                        if (this.chatInput) {
+                            this.chatInput.value = result.text.trim();
+                        }
+                        this.handleSend();
+                    } else if (result && result.text === '') {
+                        if (this.chatInput) {
+                            this.chatInput.placeholder = "No clear speech detected. Click mic to speak again.";
+                        }
+                        this.updateStateBadge('IDLE');
+                    } else {
+                        throw new Error((result && result.error) || 'STT recognition issue');
+                    }
+                } catch (sttErr) {
+                    console.warn("[VOICE] Neural STT Fallback:", sttErr);
+                    this.updateStateBadge('IDLE');
+                    if (this.chatInput) {
+                        this.chatInput.placeholder = "Type your query below and press Enter...";
+                    }
+                    this.appendMessage("ℹ️ Voice recognized no audio or was quiet. You can type directly in the input box below!", false, true);
+                }
+            };
+
+            const autoTimer = setTimeout(stopNeuralRecording, 3800);
+            
+            // Allow manual toggle to stop early
+            const earlyStopHandler = () => {
+                clearTimeout(autoTimer);
+                this.chatMic.removeEventListener('click', earlyStopHandler);
+                stopNeuralRecording();
+            };
+            setTimeout(() => {
+                this.chatMic.addEventListener('click', earlyStopHandler, { once: true });
+            }, 300);
+
+        } catch (mediaErr) {
+            console.warn("[VOICE] Microphone getUserMedia failed:", mediaErr);
+            this.stopRecording();
+            this.updateStateBadge('IDLE');
+            this.appendMessage("⚠️ <strong>Microphone Access</strong>: Please check microphone permissions in your operating system or browser.", false, true);
         }
+    }
+
+    encodeWAV(samples, inputSampleRate, targetSampleRate) {
+        // Linear interpolation downsampling
+        const ratio = inputSampleRate / targetSampleRate;
+        const newLength = Math.round(samples.length / ratio);
+        const result = new Int16Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+
+        while (offsetResult < result.length) {
+            const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+            let accum = 0, count = 0;
+            for (let i = offsetBuffer; i < nextOffsetBuffer && i < samples.length; i++) {
+                accum += samples[i];
+                count++;
+            }
+            const s = Math.max(-1, Math.min(1, count > 0 ? accum / count : samples[offsetBuffer] || 0));
+            result[offsetResult] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            offsetResult++;
+            offsetBuffer = nextOffsetBuffer;
+        }
+
+        // WAV Header (44 bytes)
+        const wavBuffer = new ArrayBuffer(44 + result.length * 2);
+        const view = new DataView(wavBuffer);
+
+        const writeString = (view, offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + result.length * 2, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true); // SubChunk1Size (16 for PCM)
+        view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
+        view.setUint16(22, 1, true);  // NumChannels (1 mono)
+        view.setUint32(24, targetSampleRate, true); // SampleRate
+        view.setUint32(28, targetSampleRate * 2, true); // ByteRate
+        view.setUint16(32, 2, true);  // BlockAlign
+        view.setUint16(34, 16, true); // BitsPerSample
+        writeString(view, 36, 'data');
+        view.setUint32(40, result.length * 2, true);
+
+        // Write PCM 16-bit samples
+        const output = new Int16Array(wavBuffer, 44);
+        output.set(result);
+
+        return wavBuffer;
     }
 
     stopRecording() {

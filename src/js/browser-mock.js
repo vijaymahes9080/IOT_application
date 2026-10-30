@@ -313,6 +313,21 @@
         triggerAlert: (title, body) => console.warn(`[ALERT] ${title}: ${body}`),
         openTerminal: () => alert("Raw Telemetry Terminal (In Electron or CLI via agy/serial)."),
         updateCloudCode: () => {},
+        aiTranscribe: async (audioBuffer) => {
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'audio/wav' },
+                    body: audioBuffer
+                });
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (err) {
+                console.warn("[BROWSER-MOCK] aiTranscribe error:", err);
+            }
+            return { success: false, error: "Browser mock transcribe unavailable" };
+        },
         getAppVersion: async () => "1.0.0 (Web Browser Mode)"
     };
 })();

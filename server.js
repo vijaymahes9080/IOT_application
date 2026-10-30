@@ -46,6 +46,40 @@ const server = http.createServer((req, res) => {
     const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
     let pathname = decodeURIComponent(parsedUrl.pathname);
 
+    // API: Proxy Speech-to-Text Transcription to Python AI daemon if running
+    if (pathname === '/transcribe' || pathname === '/api/transcribe') {
+        if (req.method === 'POST') {
+            const chunks = [];
+            req.on('data', chunk => chunks.push(chunk));
+            req.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                const proxyReq = http.request({
+                    hostname: '127.0.0.1',
+                    port: 5005,
+                    path: '/transcribe',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': req.headers['content-type'] || 'audio/wav',
+                        'Content-Length': buffer.length
+                    }
+                }, (proxyRes) => {
+                    res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
+                    proxyRes.pipe(res);
+                });
+                proxyReq.on('error', () => {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: "AI transcription service temporarily unavailable"
+                    }));
+                });
+                proxyReq.write(buffer);
+                proxyReq.end();
+            });
+            return;
+        }
+    }
+
     // API: Proxy Chat queries to Python AI daemon if running
     if (pathname === '/chat' || pathname === '/api/chat') {
         if (req.method === 'POST') {

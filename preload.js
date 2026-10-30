@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getHardwareStatus: () => ipcRenderer.invoke('get-hardware-status'),
     getLatestTelemetry: () => ipcRenderer.invoke('get-latest-telemetry'),
     sendHardwareCommand: (command) => ipcRenderer.invoke('send-hardware-command', command),
+    aiTranscribe: (audioBuffer) => ipcRenderer.invoke('ai-transcribe', audioBuffer),
     getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

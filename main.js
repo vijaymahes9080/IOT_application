@@ -479,6 +479,26 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle('ai-transcribe', async (event, audioBuffer) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const rawData = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
+      const response = await fetch(`${AI_SERVICE_URL}/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'audio/wav' },
+        body: rawData,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.warn('[MAIN] [AI-TRANSCRIBE] Warning:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
   // DB Proxies & Logging
   ipcMain.handle('get-recent-telemetry', async (e, limit) => dbMgr?.getRecentTelemetry?.(limit) || []);
   ipcMain.handle('get-anomaly-history', async (e, days) => dbMgr?.getAnomalyHistory?.(days) || []);
