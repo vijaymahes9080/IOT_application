@@ -193,4 +193,20 @@ server.listen(PORT, () => {
     console.log(`-> URL: http://localhost:${PORT}/`);
     console.log(`-> Testing Mode: Browser Live Testing Enabled`);
     console.log('===================================================');
+
+    // Start Telegram bot if configured
+    try {
+        const TelegramBot = require('./services/telegram-bot');
+        const handler = require('./services/telegram-handler');
+        const bot = new TelegramBot();
+        if (bot.token) {
+            bot.startPolling(async ({ text }) => handler.handle({ text }));
+            console.log('[Telegram] Bot started (polling).');
+            global.telegramBot = bot;
+        } else {
+            console.log('[Telegram] TELEGRAM_BOT_TOKEN not set; bot disabled.');
+        }
+    } catch (e) {
+        console.error('[Telegram] Failed to start bot:', e.message);
+    }
 });
