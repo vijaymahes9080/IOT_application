@@ -26,7 +26,9 @@ log.setLevel(logging.ERROR)
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-app = Flask(__name__)
+app = Flask(__name__)
+from flask_cors import CORS
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Load Unified Configuration System
 
@@ -515,6 +517,36 @@ def call_gemini(query_text, telemetry=None):
 
     return None
 
+@app.route('/transcribe', methods=['POST'])
+def transcribe_audio():
+    """Server-side Speech-to-Text endpoint supporting audio file/blob upload."""
+    try:
+        import speech_recognition as sr
+        import io
+        audio_data = None
+        if 'audio' in request.files:
+            audio_data = request.files['audio'].read()
+        elif request.data:
+            audio_data = request.data
+        elif request.json and 'audio_base64' in request.json:
+            import base64
+            audio_data = base64.b64decode(request.json['audio_base64'])
+
+        if not audio_data or len(audio_data) < 100:
+            return jsonify({'success': False, 'error': 'No valid audio received'}), 400
+
+        r = sr.Recognizer()
+        with sr.AudioFile(io.BytesIO(audio_data)) as source:
+            recorded = r.record(source)
+
+        text = r.recognize_google(recorded)
+        return jsonify({'success': True, 'text': text})
+    except Exception as e:
+        err_msg = str(e)
+        if 'UnknownValueError' in type(e).__name__ or not err_msg:
+            return jsonify({'success': True, 'text': '', 'error': 'No speech detected'})
+        return jsonify({'success': False, 'error': err_msg}), 200
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe_audio():
     """Server-side Speech-to-Text endpoint supporting audio file/blob upload."""

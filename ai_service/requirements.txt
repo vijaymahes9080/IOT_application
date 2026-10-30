@@ -18,3 +18,4 @@ Jinja2
 MarkupSafe
 Werkzeug
 SpeechRecognition
+flask-cors
