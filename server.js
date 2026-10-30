@@ -200,7 +200,7 @@ server.listen(PORT, () => {
         const handler = require('./services/telegram-handler');
         const bot = new TelegramBot();
         if (bot.token) {
-            bot.startPolling(async ({ text, chatId, fromId, msg }) => handler.handle({ text, chatId, fromId, msg }));
+            bot.startPolling(async ({ text, chatId, fromId, msg, isAuthorized }) => handler.handle({ text, chatId, fromId, msg, isAuthorized }));
             console.log('[Telegram] Bot started (polling mode active).');
             global.telegramBot = bot;
         } else {

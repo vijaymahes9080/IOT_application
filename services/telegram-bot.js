@@ -201,8 +201,8 @@ class TelegramBot extends EventEmitter {
     }
 
     try {
-      console.log(`[TelegramBot] [HANDLER_EXEC] Dispatching to intent handler for Chat ID: ${chatId} | Command/Text: "${text.slice(0, 30)}"`);
-      const reply = await handler({ chatId, fromId, text, msg });
+      console.log(`[TelegramBot] [HANDLER_EXEC] Dispatching to intent handler for Chat ID: ${chatId} | Command/Text: "${text.slice(0, 30)}" | Authorized: ${authorized}`);
+      const reply = await handler({ chatId, fromId, text, msg, isAuthorized: authorized });
       if (reply) {
         await this.sendMessage(chatId, reply);
       }
