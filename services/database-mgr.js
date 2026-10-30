@@ -530,6 +530,24 @@ module.exports = {
         }
     },
 
+    getLatestTelemetryRecord: async () => {
+        try {
+            const cacheKey = 'latestTelemetryRecord';
+            const cached = globalCache.get(cacheKey);
+            if (cached) return cached;
+            const sql = 'SELECT TOP 1 id, timestamp_log, farm_id, crop_type, satellite_lat, satellite_lon, satellite_distance_km, satellite_velocity_kms, temp1, temp2, batt_voltage, current_amps, solar_power_w, gyro_x, gyro_y, gyro_z, soil_moisture, soil_temp, ldr_sensor, humidity, ultrasonic_dist FROM telemetry_logs ORDER BY id DESC';
+            const results = await safeQuery(sql);
+            const record = (Array.isArray(results) && results.length > 0) ? results[0] : null;
+            if (record) globalCache.set(cacheKey, record, 2); // 2-second short cache for high freshness
+            return record;
+        } catch (e) {
+            console.error('[DB] Error getting latest telemetry record:', e.message);
+            return null;
+        }
+    },
+
+    safeQuery,
+
     getRecentTelemetry: async (limitRows) => {
         try {
             const limit = sanitizeNum(limitRows) || 100;
@@ -540,7 +558,7 @@ module.exports = {
             const sql = `SELECT TOP ${limit} id, timestamp_log, farm_id, crop_type,
                 satellite_lat, satellite_lon, satellite_distance_km, satellite_velocity_kms,
                 temp1, temp2, batt_voltage, current_amps, solar_power_w,
-                gyro_x, gyro_y, gyro_z, soil_moisture, soil_temp, ldr_sensor
+                gyro_x, gyro_y, gyro_z, soil_moisture, soil_temp, ldr_sensor, humidity, ultrasonic_dist
                 FROM telemetry_logs ORDER BY id DESC`;
             const results = await safeQuery(sql);
             // Reverse so data is chronological for sequence training
