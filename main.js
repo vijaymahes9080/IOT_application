@@ -553,6 +553,24 @@ app.whenReady().then(() => {
       mainWindow.show();
     }
   });
+
+  // Automatically start Telegram Bot polling if token is configured
+  try {
+    const TelegramBot = require('./services/telegram-bot');
+    const telegramHandler = require('./services/telegram-handler');
+    const bot = new TelegramBot();
+    if (bot.token) {
+      bot.startPolling(async (payload) => {
+        return await telegramHandler.handle(payload);
+      });
+      global.telegramBot = bot;
+      console.log('[MAIN] [Telegram] Bot service automatically started on application launch.');
+    } else {
+      console.log('[MAIN] [Telegram] TELEGRAM_BOT_TOKEN not configured; Telegram bot service skipped.');
+    }
+  } catch (err) {
+    console.error('[MAIN] [Telegram] Failed to initialize bot service:', err.message);
+  }
 });
 
 let gpuCrashCount = 0;
