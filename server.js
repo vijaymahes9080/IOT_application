@@ -200,11 +200,11 @@ server.listen(PORT, () => {
         const handler = require('./services/telegram-handler');
         const bot = new TelegramBot();
         if (bot.token) {
-            bot.startPolling(async ({ text }) => handler.handle({ text }));
-            console.log('[Telegram] Bot started (polling).');
+            bot.startPolling(async ({ text, chatId, fromId, msg }) => handler.handle({ text, chatId, fromId, msg }));
+            console.log('[Telegram] Bot started (polling mode active).');
             global.telegramBot = bot;
         } else {
-            console.log('[Telegram] TELEGRAM_BOT_TOKEN not set; bot disabled.');
+            console.log('[Telegram] TELEGRAM_BOT_TOKEN not configured; bot disabled.');
         }
     } catch (e) {
         console.error('[Telegram] Failed to start bot:', e.message);
